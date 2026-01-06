@@ -1,0 +1,40 @@
+This project is part of OpenLoong Framework
+Copyright (C) 2025, 人形机器人（上海）有限公司
+
+This product includes software developed at
+人形机器人（上海）有限公司 (http://www.openloong.net/).
+
+--------------------------------------
+SOFTWARE DISTRIBUTED WITH THIS SOFTWARE:
+
+This software includes a number of subcomponents with
+separate copyright notices and license terms. Your use of the source
+code for the these subcomponents is subject to the terms and
+conditions of the following licenses.
+
+NOTE:
+The lib(s) in third_party/lib_lin_a64 or third_party/lib_lin_x64, are 
+precompiled librarie(s) for convenience. They can be obtained from the 
+source compilation of these component(s).
+
+For files in directory third_party/include:
+
+
+eigen3:
+----------
+// This file is part of Eigen, a lightweight C++ template library
+// for linear algebra.
+//
+// This Source Code Form is subject to the terms of the Mozilla
+// Public License v. 2.0. If a copy of the MPL was not distributed
+// with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+-----------
+
+
+quill:
+-----------
+/**
+ * Copyright(c) 2020-present, Odysseas Georgoudis & quill contributors.
+ * Distributed under the MIT License (http://opensource.org/licenses/MIT)
+ */
+-----------

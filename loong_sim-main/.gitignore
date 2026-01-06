@@ -1,0 +1,8 @@
+build
+build2
+.vscode
+
+*.txt
+
+!CMakeLists.txt
+nabo_output

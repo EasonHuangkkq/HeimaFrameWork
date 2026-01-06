@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Config>
+    <ECAT>
+        <Devices>
+            <Device type="MT_Device">
+                <VendorID>0x00202008</VendorID> 
+                <ProductCode>0x00000000</ProductCode>
+
+                <RxPDOs index="0x1600">
+                    <Object>Controlword</Object>
+                    <Object>TargetPosition</Object>
+                    <Object>TargetVelocity</Object>
+                    <Object>TargetTorque</Object>
+                    <Object>MaxTorque</Object>     
+                    <Object>Mode</Object>
+                    <Object>RxPDOPadding</Object>
+                </RxPDOs>
+
+                <TxPDOs index="0x1a00">
+                    <Object>StatusWord</Object>
+                    <Object>ActualPosition</Object>
+                    <Object>ActualVelocity</Object>
+                    <Object>ActualTorque</Object>
+                    <Object>ErrorCode</Object>
+                    <Object>ModeDisplay</Object>
+                    <Object>TxPDOPadding</Object>
+                </TxPDOs>
+
+                <Dictionary>
+                    <!-- Alias left read-only to avoid SDO write failures on devices that do not accept alias download -->
+                    <Object index="0x0000" subindex="0x00" signed="0" bit_length="0"  operation="1">Alias</Object>
+
+                    <Object index="0x607a" subindex="0x00" signed="1" bit_length="32" operation="0">TargetPosition</Object>
+                    <Object index="0x60ff" subindex="0x00" signed="1" bit_length="32" operation="0">TargetVelocity</Object>
+                    <Object index="0x6071" subindex="0x00" signed="1" bit_length="16" operation="0">TargetTorque</Object>
+                    <Object index="0x6040" subindex="0x00" signed="0" bit_length="16" operation="0">Controlword</Object>
+                    <Object index="0x6072" subindex="0x00" signed="0" bit_length="16" operation="0">MaxTorque</Object>
+                    <Object index="0x6060" subindex="0x00" signed="1" bit_length="8"  operation="0">Mode</Object>
+                    <Object index="0x5ffe" subindex="0x00" signed="0" bit_length="8"  operation="0">RxPDOPadding</Object>
+
+                    <Object index="0x6064" subindex="0x00" signed="1" bit_length="32" operation="1">ActualPosition</Object>
+                    <Object index="0x606c" subindex="0x00" signed="1" bit_length="32" operation="1">ActualVelocity</Object>
+                    <Object index="0x6077" subindex="0x00" signed="1" bit_length="16" operation="1">ActualTorque</Object>
+                    <Object index="0x6041" subindex="0x00" signed="0" bit_length="16" operation="1">StatusWord</Object>
+                    <Object index="0x603f" subindex="0x00" signed="0" bit_length="16" operation="1">ErrorCode</Object>
+                    <Object index="0x6061" subindex="0x00" signed="1" bit_length="8"  operation="1">ModeDisplay</Object>
+                    <Object index="0x5ffe" subindex="0x00" signed="0" bit_length="8"  operation="1">TxPDOPadding</Object>
+                </Dictionary>
+            </Device>
+        </Devices>
+
+        <Categories>
+            <Category name="driver">
+                <Type>MT_Device</Type>
+            </Category>
+        </Categories>
+
+        <Masters>
+            <Master order="0" dc="true" period="1000000"/>
+        </Masters>
+
+        <Domains>
+            <Domain master="0" order="0" division="1"/>
+            <Domain master="0" order="1" division="1"/>
+            <Domain master="0" order="2" division="1"/>
+            <Domain master="0" order="3" division="1"/>
+            <Domain master="0" order="4" division="1"/>
+            <Domain master="0" order="5" division="1"/>
+            <Domain master="0" order="6" division="1"/>
+            <Domain master="0" order="7" division="1"/>
+        </Domains>
+
+        <Slaves>
+            <Slave master="0" domain="0" alias="1" type="MT_Device">1</Slave>
+            <Slave master="0" domain="1" alias="2" type="MT_Device">1</Slave>
+            <Slave master="0" domain="2" alias="3" type="MT_Device">1</Slave>
+            <Slave master="0" domain="3" alias="4" type="MT_Device">1</Slave>
+            <Slave master="0" domain="4" alias="5" type="MT_Device">1</Slave>
+            <Slave master="0" domain="5" alias="6" type="MT_Device">1</Slave>
+            <Slave master="0" domain="6" alias="7" type="MT_Device">1</Slave>
+            <Slave master="0" domain="7" alias="8" type="MT_Device">1</Slave>
+        </Slaves>
+    </ECAT>
+
+    <Motors>
+        <!-- Place the single motor under waist (limb=4) to avoid left/right symmetry checks -->
+        <Motor limb="4" motor="0" alias="1">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>19.612</GearRatioTor>
+            <GearRatioPosVel>19.612</GearRatioPosVel>
+            <RatedCurrent>9.5</RatedCurrent>
+            <TorqueConstant>2.1</TorqueConstant>
+            <RatedTorque>20</RatedTorque>
+            <MaximumTorque>60</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <!-- Additional motors can be defined here as needed -->
+        <Motor limb="4" motor="1" alias="2">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>19.612</GearRatioTor>
+            <GearRatioPosVel>19.612</GearRatioPosVel>
+            <RatedCurrent>9.5</RatedCurrent>
+            <TorqueConstant>2.1</TorqueConstant>
+            <RatedTorque>20</RatedTorque>
+            <MaximumTorque>60</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="2" alias="3">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>19.612</GearRatioTor>
+            <GearRatioPosVel>19.612</GearRatioPosVel>
+            <RatedCurrent>9.5</RatedCurrent>
+            <TorqueConstant>2.1</TorqueConstant>
+            <RatedTorque>20</RatedTorque>
+            <MaximumTorque>60</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="3" alias="4">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>19.612</GearRatioTor>
+            <GearRatioPosVel>19.612</GearRatioPosVel>
+            <RatedCurrent>9.5</RatedCurrent>
+            <TorqueConstant>2.1</TorqueConstant>
+            <RatedTorque>20</RatedTorque>
+            <MaximumTorque>60</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="4" alias="5">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>36</GearRatioTor>
+            <GearRatioPosVel>36</GearRatioPosVel>
+            <RatedCurrent>6.1</RatedCurrent>
+            <TorqueConstant>1.9</TorqueConstant>
+            <RatedTorque>10.5</RatedTorque>
+            <MaximumTorque>34</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="5" alias="6">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>36</GearRatioTor>
+            <GearRatioPosVel>36</GearRatioPosVel>
+            <RatedCurrent>6.1</RatedCurrent>
+            <TorqueConstant>1.9</TorqueConstant>
+            <RatedTorque>10.5</RatedTorque>
+            <MaximumTorque>34</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="6" alias="7">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>36</GearRatioTor>
+            <GearRatioPosVel>36</GearRatioPosVel>
+            <RatedCurrent>6.1</RatedCurrent>
+            <TorqueConstant>1.9</TorqueConstant>
+            <RatedTorque>10.5</RatedTorque>
+            <MaximumTorque>34</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="7" alias="8">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>36</GearRatioTor>
+            <GearRatioPosVel>36</GearRatioPosVel>
+            <RatedCurrent>6.1</RatedCurrent>
+            <TorqueConstant>1.9</TorqueConstant>
+            <RatedTorque>10.5</RatedTorque>
+            <MaximumTorque>34</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+    </Motors>
+    <IMU device="/dev/ttyACM0" baudrate="921600" type="YeSense"/>
+
+    <!-- Empty bus stubs to satisfy parser expectations -->
+    <RS485>
+        <Slaves/>
+    </RS485>
+    <RS485Emu>
+        <Slaves/>
+    </RS485Emu>
+    <CAN>
+        <Slaves/>
+        <Masters period="1000000"/>
+    </CAN>
+</Config>

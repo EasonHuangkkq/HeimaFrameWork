@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Generated build outputs
+heimaSDK_copy/build/
+
+# Runtime outputs
+**/log/
+**/nabo_output/
+
+# IDE
+.vscode/
+.idea/
