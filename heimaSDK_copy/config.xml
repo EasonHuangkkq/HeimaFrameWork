@@ -68,6 +68,14 @@
             <Domain master="0" order="5" division="1"/>
             <Domain master="0" order="6" division="1"/>
             <Domain master="0" order="7" division="1"/>
+            <Domain master="0" order="8" division="1"/>
+            <Domain master="0" order="9" division="1"/>
+            <Domain master="0" order="10" division="1"/>
+            <Domain master="0" order="11" division="1"/>
+            <Domain master="0" order="12" division="1"/>
+            <Domain master="0" order="13" division="1"/>
+            <Domain master="0" order="14" division="1"/>
+            <Domain master="0" order="15" division="1"/>
         </Domains>
 
         <Slaves>
@@ -79,6 +87,14 @@
             <Slave master="0" domain="5" alias="6" type="MT_Device">1</Slave>
             <Slave master="0" domain="6" alias="7" type="MT_Device">1</Slave>
             <Slave master="0" domain="7" alias="8" type="MT_Device">1</Slave>
+            <Slave master="0" domain="8" alias="9" type="MT_Device">1</Slave>
+            <Slave master="0" domain="9" alias="10" type="MT_Device">1</Slave>
+            <Slave master="0" domain="10" alias="11" type="MT_Device">1</Slave>
+            <Slave master="0" domain="11" alias="12" type="MT_Device">1</Slave>
+            <Slave master="0" domain="12" alias="13" type="MT_Device">1</Slave>
+            <Slave master="0" domain="13" alias="14" type="MT_Device">1</Slave>
+            <Slave master="0" domain="14" alias="15" type="MT_Device">1</Slave>
+            <Slave master="0" domain="15" alias="16" type="MT_Device">1</Slave>
         </Slaves>
     </ECAT>
 
@@ -177,6 +193,111 @@
             <MaximumPosition>6.283185</MaximumPosition>
         </Motor>
         <Motor limb="4" motor="7" alias="8">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>36</GearRatioTor>
+            <GearRatioPosVel>36</GearRatioPosVel>
+            <RatedCurrent>6.1</RatedCurrent>
+            <TorqueConstant>1.9</TorqueConstant>
+            <RatedTorque>10.5</RatedTorque>
+            <MaximumTorque>34</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="8" alias="9">
+            <Polarity>-1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>19.612</GearRatioTor>
+            <GearRatioPosVel>19.612</GearRatioPosVel>
+            <RatedCurrent>9.5</RatedCurrent>
+            <TorqueConstant>2.1</TorqueConstant>
+            <RatedTorque>20</RatedTorque>
+            <MaximumTorque>60</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <!-- Additional motors can be defined here as needed -->
+        <Motor limb="4" motor="9" alias="10">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>19.612</GearRatioTor>
+            <GearRatioPosVel>19.612</GearRatioPosVel>
+            <RatedCurrent>9.5</RatedCurrent>
+            <TorqueConstant>2.1</TorqueConstant>
+            <RatedTorque>20</RatedTorque>
+            <MaximumTorque>60</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="10" alias="11">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>19.612</GearRatioTor>
+            <GearRatioPosVel>19.612</GearRatioPosVel>
+            <RatedCurrent>9.5</RatedCurrent>
+            <TorqueConstant>2.1</TorqueConstant>
+            <RatedTorque>20</RatedTorque>
+            <MaximumTorque>60</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="11" alias="12">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>19.612</GearRatioTor>
+            <GearRatioPosVel>19.612</GearRatioPosVel>
+            <RatedCurrent>9.5</RatedCurrent>
+            <TorqueConstant>2.1</TorqueConstant>
+            <RatedTorque>20</RatedTorque>
+            <MaximumTorque>60</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="12" alias="13">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>36</GearRatioTor>
+            <GearRatioPosVel>36</GearRatioPosVel>
+            <RatedCurrent>6.1</RatedCurrent>
+            <TorqueConstant>1.9</TorqueConstant>
+            <RatedTorque>10.5</RatedTorque>
+            <MaximumTorque>34</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="13" alias="14">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>36</GearRatioTor>
+            <GearRatioPosVel>36</GearRatioPosVel>
+            <RatedCurrent>6.1</RatedCurrent>
+            <TorqueConstant>1.9</TorqueConstant>
+            <RatedTorque>10.5</RatedTorque>
+            <MaximumTorque>34</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="14" alias="15">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>36</GearRatioTor>
+            <GearRatioPosVel>36</GearRatioPosVel>
+            <RatedCurrent>6.1</RatedCurrent>
+            <TorqueConstant>1.9</TorqueConstant>
+            <RatedTorque>10.5</RatedTorque>
+            <MaximumTorque>34</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+        <Motor limb="4" motor="15" alias="16">
             <Polarity>1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>

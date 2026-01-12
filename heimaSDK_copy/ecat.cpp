@@ -208,6 +208,7 @@ int ECAT::check(){
     }
     std::sort(configAliases.begin(), configAliases.end());
     int i = 0;
+    int matchIndex = 0;
     while(i < masterInfo.slave_count){
         printf("slave %d:%d", order, i);
         ec_slave_info_t slaveInfo;
@@ -237,9 +238,9 @@ int ECAT::check(){
             strtoul(aliasEntry[1].c_str(), nullptr, 16),
             strtoul(aliasEntry[2].c_str(), nullptr, 16),
             strtoul(aliasEntry[4].c_str(), nullptr, 10));
-        // Some drives ship with alias=0; optionally match by slave index instead of alias.
-        if(ecatMatchByIndex && i < (int)configAliases.size()){
-            int cfgAlias = configAliases[i];
+        // Some drives ship with alias=0; optionally match by slave order (configured devices only).
+        if(ecatMatchByIndex && matchIndex < (int)configAliases.size()){
+            int cfgAlias = configAliases[matchIndex];
             printf(", override alias %d->%d (by index)", alias, cfgAlias);
             alias = cfgAlias;
         }else if(alias == 0 && alias2type.size() == 1){
@@ -258,6 +259,7 @@ int ECAT::check(){
             return -1;
         }
         alias2slave.insert(std::make_pair(alias, i));
+        matchIndex++;
         i++;
     }
     if(alias2slave.size() != alias2type.size()){
@@ -897,11 +899,19 @@ int ECAT::run(){
         return -1;
     }
     printf("ecats[%d] rxtx on cpu %d\n", order, cpu);
-    auto itr = alias2slave.begin();
-    while(itr != alias2slave.end()){
-        int slave = itr->second;
-        while(requestState(slave, "OP") < 0);
-        itr++;
+    ec_master_info_t masterInfo;
+    if(ecrt_master(master, &masterInfo) == 0){
+        // Request OP for all slaves (including couplers) so the master can reach OP.
+        for(unsigned int slave = 0; slave < masterInfo.slave_count; ++slave){
+            while(requestState(slave, "OP") < 0);
+        }
+    }else{
+        auto itr = alias2slave.begin();
+        while(itr != alias2slave.end()){
+            int slave = itr->second;
+            while(requestState(slave, "OP") < 0);
+            itr++;
+        }
     }
     return 0;
 }

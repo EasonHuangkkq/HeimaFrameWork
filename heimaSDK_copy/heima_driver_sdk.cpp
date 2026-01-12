@@ -424,11 +424,12 @@ int DriverSDK::impClass::init(char const* xmlFile){
 }
 
 int DriverSDK::impClass::putDriverSDORequest(SDOMsg const& msg, int const priority){
-    if(ecats[drivers[msg.alias - 1].order].sdoRequestable && drivers[msg.alias - 1].tx->StatusWord > 0){
+    int const order = drivers[msg.alias - 1].order;
+    if(order >= 0 && ecats[order].sdoRequestable){
         SDOMsg* sdoMsg = new SDOMsg();
         *sdoMsg = msg;
         sdoMsg->state = 0;
-        ecats[drivers[msg.alias - 1].order].sdoRequestQueue.put(sdoMsg, priority);
+        ecats[order].sdoRequestQueue.put(sdoMsg, priority);
         return 0;
     }
     return -1;
@@ -950,42 +951,24 @@ int DriverSDK::setMotorTarget(std::vector<motorTargetStruct> const& data){
         }
         if(drivers[i].busCode == 0){
             switch(drivers[i].enabled){
-            case 1:
+            case 1://
                 switch(drivers[i].tx->StatusWord & 0x007f){
-                case 0x0031:
+                case 0x0031://说明还没到最终可运行状态 → 先发 ControlWord = 0x07（准备/上电那一步）
                     drivers[i].rx->Mode = operatingMode[i];
                     drivers[i].rx->ControlWord = 0x07;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
-                    drivers[i].rx->Mode = operatingMode[i];
-                    drivers[i].rx->ControlWord = 0x07;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
-                    drivers[i].rx->Mode = operatingMode[i];
-                    drivers[i].rx->ControlWord = 0x07;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
                     break;
-                case 0x0033:
+                case 0x0033://说明已经更接近可运行 → 发 ControlWord = 0x0f（请求进入 Enable Operation）
+                    drivers[i].rx->Mode = operatingMode[i];
                     drivers[i].rx->ControlWord = 0x0f;
                     drivers[i].rx->TargetPosition = drivers[i].tx->ActualPosition;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
-                    drivers[i].rx->ControlWord = 0x0f;
-                    drivers[i].rx->TargetPosition = drivers[i].tx->ActualPosition;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
-                    drivers[i].rx->ControlWord = 0x0f;
-                    drivers[i].rx->TargetPosition = drivers[i].tx->ActualPosition;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
                     break;
                 case 0x0037:
-                    drivers[i].rx->Mode = operatingMode[i];
+                    drivers[i].rx->Mode = operatingMode[i];//说明已经 Operation Enabled 了
                     // Keep set-point enable high in cyclic synchronous modes so drives accept new targets.
                     drivers[i].rx->ControlWord = 0x1f;
                     break;
                 default:
                     drivers[i].rx->ControlWord = 0x06;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
-                    drivers[i].rx->ControlWord = 0x06;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
-                    drivers[i].rx->ControlWord = 0x06;
-                    imp.ecats[drivers[i].order].rxPDOSwaps[drivers[i].domain]->advanceNodePtr();
                 }
                 break;
             case 0:
