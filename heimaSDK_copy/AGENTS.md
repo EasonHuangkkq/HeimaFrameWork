@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Root holds the C/C++20 EtherCAT driver stack: `loong_driver_sdk.*` orchestrates buses, `ecat.*` wraps the EtherCAT master, `rs232.*` and `rs485.*` cover serial links, `config_xml.*` parses `config.xml` to build alias/type maps, `common.*` and `ptr_que.h` provide shared data structures, `tinyxml2.*` is vendored XML support, and `robot_multi_joint_api.c` offers a reference entrypoint.
+- This directory holds the C/C++20 EtherCAT driver stack: `loong_driver_sdk.*` orchestrates buses, `ecat.*` wraps the EtherCAT master, `rs232.*` and `rs485.*` cover serial links, `config_xml.*` parses `config.xml` to build alias/type maps, `common.*` and `ptr_que.h` provide shared data structures, `tinyxml2.*` is vendored XML support, and `robot_multi_joint_api.c` offers a reference entrypoint.
 - Build outputs land in `build/` (created by scripts); keep `config.xml` beside binaries or provide an absolute path when loading.
 
 ## Build, Test, and Development Commands

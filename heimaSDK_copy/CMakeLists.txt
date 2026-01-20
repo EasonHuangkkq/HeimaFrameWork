@@ -51,17 +51,100 @@ target_link_libraries(driver_sdk PUBLIC
 )
 
 # ==========================================
-# 4. 生成可执行文件 (run_motor)
+# 4. 生成可执行文件
 # ==========================================
-add_executable(run_motor main.cpp)
+if(EXISTS "${PROJECT_SOURCE_DIR}/main.cpp")
+    add_executable(run_motor main.cpp)
+    target_link_libraries(run_motor PUBLIC driver_sdk)
+endif()
 
-# 链接上面生成的 SDK
-target_link_libraries(run_motor PUBLIC driver_sdk)
+# Leg smoke test executable
+add_executable(leg_smoke_test
+    leg_smoke_test.cpp
+    heima_driver_sdk.cpp
+    ecat.cpp
+    rs485.cpp
+    can.cpp
+)
+target_link_libraries(leg_smoke_test PUBLIC
+    driver_sdk
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+# Arm smoke test executable
+add_executable(arm_smoke_test
+    arm_smoke_test.cpp
+    heima_driver_sdk.cpp
+    ecat.cpp
+    rs485.cpp
+    can.cpp
+)
+target_link_libraries(arm_smoke_test PUBLIC
+    driver_sdk
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+# Whole body smoke test executable (33 motors with optional IMU)
+add_executable(whole_body_smoke_test
+    whole_body_smoke_test.cpp
+    heima_driver_sdk.cpp
+    ecat.cpp
+    rs485.cpp
+    can.cpp
+    rs232.cpp
+    yesense_imu.cpp
+    yesense/src/yesense_decoder.cpp
+    yesense/src/yesense_std_out_decoder.cpp
+)
+target_compile_definitions(whole_body_smoke_test PRIVATE ENABLE_RS232)
+target_link_libraries(whole_body_smoke_test PUBLIC
+    driver_sdk
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+# Python/ctypes-friendly shared library (C ABI)
+add_library(heima_sdk_c SHARED
+    heima_sdk_c_api.cpp
+    heima_driver_sdk.cpp
+    ecat.cpp
+    rs485.cpp
+    can.cpp
+    rs232.cpp
+    yesense_imu.cpp
+    yesense/src/yesense_decoder.cpp
+    yesense/src/yesense_std_out_decoder.cpp
+    common.cpp
+    config_xml.cpp
+    tinyxml2.cpp
+)
+target_compile_definitions(heima_sdk_c PRIVATE ENABLE_RS232)
+target_link_libraries(heima_sdk_c PUBLIC
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
 
 # ==========================================
 # 5. 安装配置 (保持与原脚本结构一致)
 # ==========================================
-install(TARGETS driver_sdk run_motor
+set(INSTALL_TARGETS
+    driver_sdk
+    leg_smoke_test
+    arm_smoke_test
+    whole_body_smoke_test
+    heima_sdk_c
+)
+if(TARGET run_motor)
+    list(APPEND INSTALL_TARGETS run_motor)
+endif()
+
+install(TARGETS ${INSTALL_TARGETS}
     RUNTIME DESTINATION .
     LIBRARY DESTINATION .
 )

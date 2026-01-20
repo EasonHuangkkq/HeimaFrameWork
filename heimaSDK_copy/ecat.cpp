@@ -479,11 +479,11 @@ int ECAT::config(){
         }
         if(dc){
             ecrt_slave_config_dc(slaveConfig, 0x0300, domainDivision[domain] * period, domainDivision[domain] * period / 2, 0, 0);
-            /* if(refClockSlaveConfig == nullptr){
+            if(refClockSlaveConfig == nullptr){
                 refClockSlaveConfig = slaveConfig;
                 ecrt_master_select_reference_clock(master, refClockSlaveConfig);
                 printf("\tslave %d:%d was selected to provide the reference clock\n", order, slave);
-            } */
+            } 
         }
         itr++;
     }

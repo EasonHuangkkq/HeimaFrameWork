@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 heimaFrameWork 项目进度跟踪</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .progress-bar { transition: width 0.5s ease-in-out; }
+        .task-item { transition: all 0.3s ease; }
+        .task-item:hover { transform: translateX(4px); }
+        .section-content { transition: max-height 0.3s ease-in-out; }
+        .checkbox-custom:checked + label { text-decoration: line-through; opacity: 0.6; }
+        @media print {
+            .no-print { display: none !important; }
+            .section-content { max-height: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-300">
+    <div id="app" class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                        <i data-lucide="rocket" class="w-7 h-7 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">heimaFrameWork</h1>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">项目进度跟踪系统</p>
+                    </div>
+                </div>
+                <div class="flex gap-2 no-print">
+                    <button onclick="toggleDarkMode()" class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                        <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+                        <i data-lucide="sun" class="w-5 h-5 hidden dark:block text-yellow-400"></i>
+                    </button>
+                    <button onclick="exportProgress()" class="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition flex items-center gap-2">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        导出
+                    </button>
+                    <label class="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium transition flex items-center gap-2 cursor-pointer">
+                        <i data-lucide="upload" class="w-4 h-4"></i>
+                        导入
+                        <input type="file" accept=".json" onchange="importProgress(event)" class="hidden">
+                    </label>
+                    <button onclick="resetAll()" class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium transition flex items-center gap-2">
+                        <i data-lucide="refresh-ccw" class="w-4 h-4"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+
+            <!-- Overall Progress -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-4">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-lg font-semibold text-gray-900 dark:text-white">总体进度</span>
+                    <span id="overallPercent" class="text-2xl font-bold text-blue-600 dark:text-blue-400">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                    <div id="overallProgress" class="progress-bar h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="lastUpdate" class="text-sm text-gray-500 dark:text-gray-400 mt-2">最后更新: -</p>
+            </div>
+        </header>
+
+        <!-- Module Status Table -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8 overflow-x-auto">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <i data-lucide="table" class="w-5 h-5"></i>
+                模块状态总览
+            </h2>
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                        <th class="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">模块</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-900 dark:text-white">进度</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-900 dark:text-white">状态</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-900 dark:text-white">优先级</th>
+                    </tr>
+                </thead>
+                <tbody id="moduleStatusTable">
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Module Sections -->
+        <div id="moduleSections">
+        </div>
+
+        <!-- Roadmap -->
+        <section class="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl shadow-lg p-6 mb-8 text-white">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                <i data-lucide="map" class="w-5 h-5"></i>
+                开发路线图
+            </h2>
+            <div id="roadmapContainer">
+            </div>
+        </section>
+
+        <!-- Issues -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                问题清单
+            </h2>
+            <div id="issuesContainer">
+            </div>
+        </section>
+    </div>
+
+    <!-- Reset Confirmation Modal -->
+    <div id="resetModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md mx-4">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">确认重置</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">这将清除所有进度，包括所有勾选的任务。此操作不可撤销。</p>
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeResetModal()" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white font-medium">取消</button>
+                <button onclick="confirmReset()" class="px-4 py-2 rounded-lg bg-red-500 text-white font-medium">确认重置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300">
+        <span id="toastMessage"></span>
+    </div>
+
+    <script>
+        // Project data structure
+        const projectData = {
+            modules: [
+                {
+                    id: 'heimasdk',
+                    name: 'heimaSDK_copy',
+                    progress: 100,
+                    status: 'completed',
+                    priority: 'none',
+                    expanded: true,
+                    tasks: [
+                        { id: 'h1', text: 'heima_driver_sdk.h/cpp - DriverSDK主接口', done: true },
+                        { id: 'h2', text: 'ecat.h/cpp - EtherCAT封装', done: true },
+                        { id: 'h3', text: 'common.h/cpp - 三重缓冲 + 数据结构', done: true },
+                        { id: 'h4', text: 'config_xml.h/cpp - XML配置解析', done: true },
+                        { id: 'h5', text: 'rs232.h/cpp - 串口通信', done: true },
+                        { id: 'h6', text: 'rs485.h/cpp - RS485总线', done: true },
+                        { id: 'h7', text: 'can.h/cpp - CAN总线', done: true },
+                        { id: 'h8', text: 'tinyxml2.h/cpp - XML解析库', done: true },
+                        { id: 'h9', text: 'whole_body_smoke_test.cpp - 全身33电机测试', done: true },
+                        { id: 'h10', text: 'arm_smoke_test.cpp - 手臂烟雾测试', done: true },
+                        { id: 'h11', text: 'arm_mirror_demo.cpp - 手臂镜像demo', done: true },
+                        { id: 'h12', text: 'arm_traj_demo.cpp - 手臂轨迹demo', done: true },
+                        { id: 'h13', text: 'leg_smoke_test.cpp - 腿部烟雾测试', done: true },
+                        { id: 'h14', text: 'single_motor_demo.cpp - 单电机demo', done: true },
+                        { id: 'h15', text: 'mt_torque_demo.cpp - 扭矩demo', done: true },
+                        { id: 'h16', text: 'driver_test.cpp - 驱动测试', done: true },
+                        { id: 'h17', text: 'yesense_sdk_test.cpp - IMU测试', done: true },
+                        { id: 'h18', text: 'README.md - 总览文档', done: true },
+                        { id: 'h19', text: 'AGENTS.md - Agent指南', done: true },
+                        { id: 'h20', text: 'ECAT_FULL_FLOW.md - EtherCAT完整流程', done: true },
+                        { id: 'h21', text: 'ECAT_TRIPLE_BUFFER_FLOW.md - 三重缓冲流程', done: true },
+                        { id: 'h22', text: 'ECAT_DOMAIN_FLOW.md - Domain配置流程', done: true },
+                        { id: 'h23', text: 'DATAFLOW.md - 数据流文档', done: true },
+                        { id: 'h24', text: 'TASK_SHARED_MEM_FLOW.md - 任务共享内存流程', done: true }
+                    ]
+                },
+                {
+                    id: 'configxml',
+                    name: 'config.xml 配置优化',
+                    progress: 0,
+                    status: 'todo',
+                    priority: 'high',
+                    expanded: false,
+                    tasks: [
+                        { id: 'c1', text: '更新 config.xml 为完整的33电机映射', done: false },
+                        { id: 'c2', text: 'limb=0 (左腿) - 需添加 6-7个关节', done: false },
+                        { id: 'c3', text: 'limb=1 (右腿) - 需添加 6-7个关节', done: false },
+                        { id: 'c4', text: 'limb=2 (左臂) - 需添加 7个关节', done: false },
+                        { id: 'c5', text: 'limb=3 (右臂) - 需添加 7个关节', done: false },
+                        { id: 'c6', text: 'limb=4 (腰) - 现有16个需拆分为3个', done: false },
+                        { id: 'c7', text: 'limb=5 (头) - 需添加 3-4个关节', done: false },
+                        { id: 'c8', text: '验证每个电机的参数 (GearRatio, RatedCurrent等)', done: false },
+                        { id: 'c9', text: '创建 config_full_33motors.xml 作为参考', done: false }
+                    ]
+                },
+                {
+                    id: 'loongbase',
+                    name: 'loong_base-main (实机控制主程序)',
+                    progress: 10,
+                    status: 'inprogress',
+                    priority: 'medium',
+                    expanded: false,
+                    tasks: [
+                        { id: 'l1', text: '配置文件适配', done: false, subtasks: [
+                            { id: 'l1a', text: '配置 driver.ini - 驱动参数', done: false },
+                            { id: 'l1b', text: '配置 interface.ini - 接口参数', done: false },
+                            { id: 'l1c', text: '配置 thread.ini - 线程参数', done: false },
+                            { id: 'l1d', text: '配置 plan.ini - 步态规划参数', done: false }
+                        ]},
+                        { id: 'l2', text: '编译 loong_base-main', done: false, subtasks: [
+                            { id: 'l2a', text: '检查 loong_utility 依赖', done: false },
+                            { id: 'l2b', text: '检查 nabo_locomotion 库', done: false }
+                        ]},
+                        { id: 'l3', text: '运行测试', done: false, subtasks: [
+                            { id: 'l3a', text: '运行 task_driver (驱动任务)', done: false },
+                            { id: 'l3b', text: '运行 task_locomotion (步态任务)', done: false },
+                            { id: 'l3c', text: '运行 task_interface (接口任务)', done: false }
+                        ]},
+                        { id: 'l4', text: '共享内存验证', done: false, subtasks: [
+                            { id: 'l4a', text: '检查 DataCenter 数据交换', done: false },
+                            { id: 'l4b', text: '验证三重缓冲机制', done: false }
+                        ]}
+                    ]
+                },
+                {
+                    id: 'loonglocomotion',
+                    name: 'loong_ctrl_locomotion-main (步态算法库)',
+                    progress: 0,
+                    status: 'todo',
+                    priority: 'medium',
+                    expanded: false,
+                    tasks: [
+                        { id: 'n1', text: '编译 libnabo', done: false, subtasks: [
+                            { id: 'n1a', text: '检查依赖 (Eigen, ONNX, CUDA可选)', done: false },
+                            { id: 'n1b', text: '编译 x64_sim 版本', done: false },
+                            { id: 'n1c', text: '编译 x64_robot 版本 (如需实机)', done: false }
+                        ]},
+                        { id: 'n2', text: '算法配置', done: false, subtasks: [
+                            { id: 'n2a', text: '检查参数配置', done: false },
+                            { id: 'n2b', text: '验证模型文件 (.xml, .onnx)', done: false }
+                        ]},
+                        { id: 'n3', text: '单元测试', done: false, subtasks: [
+                            { id: 'n3a', text: '运行基本测试', done: false },
+                            { id: 'n3b', text: '验证步态生成', done: false }
+                        ]}
+                    ]
+                },
+                {
+                    id: 'loongsim',
+                    name: 'loong_sim-main (MuJoCo仿真)',
+                    progress: 0,
+                    status: 'todo',
+                    priority: 'low',
+                    expanded: false,
+                    tasks: [
+                        { id: 's1', text: '编译仿真环境', done: false, subtasks: [
+                            { id: 's1a', text: '检查 MuJoCo 依赖', done: false },
+                            { id: 's1b', text: '编译 main_loco', done: false }
+                        ]},
+                        { id: 's2', text: '配置模型', done: false, subtasks: [
+                            { id: 's2a', text: '验证 scene.xml', done: false },
+                            { id: 's2b', text: '检查 mesh文件', done: false }
+                        ]},
+                        { id: 's3', text: '运行测试', done: false, subtasks: [
+                            { id: 's3a', text: '运行 run_mujoco_loco.sh', done: false }
+                        ]}
+                    ]
+                },
+                {
+                    id: 'simrelease',
+                    name: 'loong_sim_sdk_release-main (预编译SDK)',
+                    progress: 50,
+                    status: 'partial',
+                    priority: 'low',
+                    expanded: false,
+                    tasks: [
+                        { id: 'r1', text: '运行全链仿真测试', done: false, subtasks: [
+                            { id: 'r1a', text: '启动 share_sim', done: true },
+                            { id: 'r1b', text: '启动 driver/locomotion/interface', done: false },
+                            { id: 'r1c', text: '验证数据流', done: false }
+                        ]},
+                        { id: 'r2', text: 'Python SDK 测试 (可选)', done: false, subtasks: [
+                            { id: 'r2a', text: '测试 loong_jnt_sdk', done: false },
+                            { id: 'r2b', text: '测试 loong_mani_sdk', done: false }
+                        ]}
+                    ]
+                }
+            ],
+            roadmap: [
+                { phase: 1, name: '配置与基础测试', time: '1-2天', items: [
+                    { id: 'p1a', text: '完成 config.xml 33电机映射 [4小时]', done: false },
+                    { id: 'p1b', text: '测试 whole_body_smoke_test [2小时]', done: false },
+                    { id: 'p1c', text: '验证所有电机基本功能 [2小时]', done: false },
+                    { id: 'p1d', text: '记录测试日志和问题 [2小时]', done: false }
+                ]},
+                { phase: 2, name: '实机控制系统', time: '2-4天', items: [
+                    { id: 'p2a', text: '配置 loong_base-main [8小时]', done: false },
+                    { id: 'p2b', text: '编译 driver/locomotion/interface [4小时]', done: false },
+                    { id: 'p2c', text: '调试共享内存通信 [8小时]', done: false },
+                    { id: 'p2d', text: '集成测试 [8小时]', done: false }
+                ]},
+                { phase: 3, name: '步态算法集成', time: '2-3天', items: [
+                    { id: 'p3a', text: '编译 libnabo [8小时]', done: false },
+                    { id: 'p3b', text: '配置算法参数 [8小时]', done: false },
+                    { id: 'p3c', text: '联调 driver + locomotion [8小时]', done: false }
+                ]},
+                { phase: 4, name: '仿真验证 (可选)', time: '1-2天', items: [
+                    { id: 'p4a', text: '搭建仿真环境 [4小时]', done: false },
+                    { id: 'p4b', text: '验证算法在仿真中运行 [8小时]', done: false }
+                ]}
+            ],
+            issues: [
+                { id: 'i1', type: 'blocking', title: 'config.xml 缺少33电机完整映射', desc: '无法测试全身电机', solution: '需要根据硬件实际拓扑填写' },
+                { id: 'i2', type: 'pending', title: 'loong_base-main 依赖链', desc: 'loong_utility 是否需要软链接? nabo_locomotion 是否已编译?', solution: '待验证' },
+                { id: 'i3', type: 'pending', title: '共享内存配置', desc: 'DataCenter 配置是否完整? 3-buffer 是否正确配置?', solution: '待验证' },
+                { id: 'i4', type: 'limitation', title: '当前 config.xml 只有16个电机', desc: '全在 limb=4 (腰部)', solution: '需要扩展到6个limb' }
+            ]
+        };
+
+        // Load from localStorage
+        function loadProgress() {
+            const saved = localStorage.getItem('heimaFrameWorkProgress');
+            if (saved) {
+                const data = JSON.parse(saved);
+                // Merge saved task states
+                data.modules.forEach(savedModule => {
+                    const module = projectData.modules.find(m => m.id === savedModule.id);
+                    if (module) {
+                        module.expanded = savedModule.expanded;
+                        savedModule.tasks.forEach(savedTask => {
+                            const task = module.tasks.find(t => t.id === savedTask.id);
+                            if (task) {
+                                task.done = savedTask.done;
+                                if (savedTask.subtasks) {
+                                    task.subtasks.forEach(savedSubtask => {
+                                        const subtask = task.subtasks.find(st => st.id === savedSubtask.id);
+                                        if (subtask) {
+                                            subtask.done = savedSubtask.done;
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+                data.roadmap.forEach(savedPhase => {
+                    const phase = projectData.roadmap.find(p => p.phase === savedPhase.phase);
+                    if (phase) {
+                        phase.items.forEach(savedItem => {
+                            const item = phase.items.find(i => i.id === savedItem.id);
+                            if (item) {
+                                item.done = savedItem.done;
+                            }
+                        });
+                    }
+                });
+                const lastSaved = localStorage.getItem('heimaFrameWorkLastUpdate');
+                if (lastSaved) {
+                    document.getElementById('lastUpdate').textContent = '最后更新: ' + new Date(lastSaved).toLocaleString('zh-CN');
+                }
+            }
+            render();
+        }
+
+        // Save to localStorage
+        function saveProgress() {
+            const dataToSave = {
+                modules: projectData.modules.map(m => ({
+                    id: m.id,
+                    expanded: m.expanded,
+                    tasks: m.tasks
+                })),
+                roadmap: projectData.roadmap.map(p => ({ phase: p.phase, items: p.items }))
+            };
+            localStorage.setItem('heimaFrameWorkProgress', JSON.stringify(dataToSave));
+            localStorage.setItem('heimaFrameWorkLastUpdate', new Date().toISOString());
+            document.getElementById('lastUpdate').textContent = '最后更新: ' + new Date().toLocaleString('zh-CN');
+        }
+
+        // Calculate overall progress
+        function calculateOverallProgress() {
+            let totalProgress = 0;
+            projectData.modules.forEach(module => {
+                const completedTasks = module.tasks.filter(t => t.done).length;
+                const totalTasks = module.tasks.length;
+                module.progress = Math.round((completedTasks / totalTasks) * 100);
+                totalProgress += module.progress;
+            });
+            return Math.round(totalProgress / projectData.modules.length);
+        }
+
+        // Render the entire UI
+        function render() {
+            renderOverallProgress();
+            renderModuleStatusTable();
+            renderModuleSections();
+            renderRoadmap();
+            renderIssues();
+            lucide.createIcons();
+        }
+
+        function renderOverallProgress() {
+            const progress = calculateOverallProgress();
+            document.getElementById('overallProgress').style.width = progress + '%';
+            document.getElementById('overallPercent').textContent = progress + '%';
+        }
+
+        function renderModuleStatusTable() {
+            const tbody = document.getElementById('moduleStatusTable');
+            tbody.innerHTML = '';
+
+            projectData.modules.forEach(module => {
+                const statusConfig = {
+                    'completed': { text: '✅ 完成', class: 'bg-green-100 text-green-800' },
+                    'inprogress': { text: '🟡 进行中', class: 'bg-yellow-100 text-yellow-800' },
+                    'todo': { text: '⏳ 待做', class: 'bg-gray-100 text-gray-800' },
+                    'partial': { text: '⚠️ 部分', class: 'bg-orange-100 text-orange-800' }
+                };
+
+                const priorityConfig = {
+                    'high': { text: '🔴 高', class: 'bg-red-100 text-red-800' },
+                    'medium': { text: '🟡 中', class: 'bg-yellow-100 text-yellow-800' },
+                    'low': { text: '🟢 低', class: 'bg-green-100 text-green-800' },
+                    'none': { text: '-', class: 'bg-gray-100 text-gray-800' }
+                };
+
+                const status = statusConfig[module.status] || statusConfig['todo'];
+                const priority = priorityConfig[module.priority] || priorityConfig['low'];
+
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-medium text-gray-900 dark:text-white">${module.name}</td>
+                    <td class="py-3 px-4 text-center">
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div class="progress-bar h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full" style="width: ${module.progress}%"></div>
+                        </div>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">${module.progress}%</span>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${status.class}">${status.text}</span>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${priority.class}">${priority.text}</span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderModuleSections() {
+            const container = document.getElementById('moduleSections');
+            container.innerHTML = '';
+
+            projectData.modules.forEach(module => {
+                const completedTasks = module.tasks.filter(t => t.done).length;
+                const totalTasks = module.tasks.length;
+                const section = document.createElement('section');
+                section.className = 'bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-6';
+
+                const statusColor = module.progress === 100 ? 'from-green-500 to-emerald-500' :
+                                  module.progress > 0 ? 'from-yellow-500 to-orange-500' :
+                                  'from-gray-500 to-gray-600';
+
+                section.innerHTML = `
+                    <div class="flex items-center justify-between cursor-pointer" onclick="toggleModule('${module.id}')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-gradient-to-br ${statusColor} rounded-lg flex items-center justify-center">
+                                <i data-lucide="${module.expanded ? 'chevron-down' : 'chevron-right'}" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">${module.name}</h3>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">${completedTasks}/${totalTasks} 已完成</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="progress-bar h-full bg-gradient-to-r ${statusColor} rounded-full" style="width: ${module.progress}%"></div>
+                            </div>
+                            <span class="text-lg font-bold text-gray-900 dark:text-white">${module.progress}%</span>
+                        </div>
+                    </div>
+                    <div class="section-content mt-4 ${module.expanded ? '' : 'hidden'}" id="content-${module.id}">
+                        <div class="space-y-3 pl-4">
+                            ${module.tasks.map(task => renderTask(task, module.id)).join('')}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(section);
+            });
+        }
+
+        function renderTask(task, moduleId) {
+            const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+            const completedSubtasks = hasSubtasks ? task.subtasks.filter(st => st.done).length : 0;
+            const totalSubtasks = hasSubtasks ? task.subtasks.length : 1;
+
+            const isDone = task.done || (hasSubtasks && completedSubtasks === totalSubtasks);
+            const progress = Math.round((completedSubtasks / totalSubtasks) * 100);
+
+            let subtasksHtml = '';
+            if (hasSubtasks) {
+                subtasksHtml = `
+                    <div class="mt-2 ml-6 space-y-2">
+                        ${task.subtasks.map(st => `
+                            <div class="task-item flex items-center gap-2">
+                                <input type="checkbox" id="${st.id}" ${st.done ? 'checked' : ''} onchange="toggleSubtask('${moduleId}', '${task.id}', '${st.id}')" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <label for="${st.id}" class="text-sm text-gray-700 dark:text-gray-300 ${st.done ? 'line-through opacity-60' : ''}">${st.text}</label>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="task-item">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="${task.id}" ${isDone ? 'checked' : ''} onchange="toggleTask('${moduleId}', '${task.id}')" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <label for="${task.id}" class="text-sm text-gray-700 dark:text-gray-300 font-medium ${isDone ? 'line-through opacity-60' : ''}">${task.text}</label>
+                    </div>
+                    ${subtasksHtml}
+                </div>
+            `;
+        }
+
+        function renderRoadmap() {
+            const container = document.getElementById('roadmapContainer');
+            container.innerHTML = '';
+
+            projectData.roadmap.forEach((phase, index) => {
+                const completedItems = phase.items.filter(i => i.done).length;
+                const totalItems = phase.items.length;
+                const progress = Math.round((completedItems / totalItems) * 100);
+
+                const phaseDiv = document.createElement('div');
+                phaseDiv.className = 'mb-6 bg-white/10 rounded-xl p-4';
+                phaseDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">阶段 ${phase.phase}</span>
+                            <span class="font-bold">${phase.name}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm opacity-80">${completedItems}/${totalItems}</span>
+                            <span class="font-bold">${progress}%</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-white/20 rounded-full h-2 mb-3">
+                        <div class="progress-bar h-full bg-white rounded-full" style="width: ${progress}%"></div>
+                    </div>
+                    <div class="space-y-2 pl-2">
+                        ${phase.items.map(item => `
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="${item.id}" ${item.done ? 'checked' : ''} onchange="toggleRoadmapItem(${phase.phase}, '${item.id}')" class="w-4 h-4 rounded border-white/30 text-white focus:ring-white">
+                                <label for="${item.id}" class="text-sm ${item.done ? 'line-through opacity-60' : ''}">${item.text}</label>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(phaseDiv);
+            });
+        }
+
+        function renderIssues() {
+            const container = document.getElementById('issuesContainer');
+            container.innerHTML = '';
+
+            const typeConfig = {
+                'blocking': { icon: 'x-circle', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20', label: '阻塞问题' },
+                'pending': { icon: 'help-circle', color: 'text-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-900/20', label: '待验证' },
+                'limitation': { icon: 'info', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20', label: '已知限制' }
+            };
+
+            Object.keys(typeConfig).forEach(type => {
+                const issues = projectData.issues.filter(i => i.type === type);
+                if (issues.length > 0) {
+                    const config = typeConfig[type];
+                    const typeSection = document.createElement('div');
+                    typeSection.className = 'mb-4';
+                    typeSection.innerHTML = `
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2 ${config.color}">
+                            <i data-lucide="${config.icon}"></i>
+                            ${config.label} (${issues.length})
+                        </h3>
+                        <div class="space-y-2">
+                            ${issues.map(issue => `
+                                <div class="p-3 rounded-lg ${config.bg} border border-${config.color.split('-')[1]}-200">
+                                    <div class="font-medium text-gray-900 dark:text-white mb-1">${issue.title}</div>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">${issue.desc}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-500"><strong>解决:</strong> ${issue.solution}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    container.appendChild(typeSection);
+                }
+            });
+        }
+
+        // Event handlers
+        function toggleModule(moduleId) {
+            const module = projectData.modules.find(m => m.id === moduleId);
+            module.expanded = !module.expanded;
+            saveProgress();
+            renderModuleSections();
+        }
+
+        function toggleTask(moduleId, taskId) {
+            const module = projectData.modules.find(m => m.id === moduleId);
+            const task = module.tasks.find(t => t.id === taskId);
+            task.done = !task.done;
+            saveProgress();
+            render();
+        }
+
+        function toggleSubtask(moduleId, taskId, subtaskId) {
+            const module = projectData.modules.find(m => m.id === moduleId);
+            const task = module.tasks.find(t => t.id === taskId);
+            const subtask = task.subtasks.find(st => st.id === subtaskId);
+            subtask.done = !subtask.done;
+            saveProgress();
+            render();
+        }
+
+        function toggleRoadmapItem(phase, itemId) {
+            const phaseObj = projectData.roadmap.find(p => p.phase === phase);
+            const item = phaseObj.items.find(i => i.id === itemId);
+            item.done = !item.done;
+            saveProgress();
+            render();
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+
+        function exportProgress() {
+            const data = JSON.stringify({
+                progress: localStorage.getItem('heimaFrameWorkProgress'),
+                lastUpdate: localStorage.getItem('heimaFrameWorkLastUpdate'),
+                exportTime: new Date().toISOString()
+            }, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `heimaFrameWork_progress_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('进度已导出！');
+        }
+
+        function importProgress(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    localStorage.setItem('heimaFrameWorkProgress', data.progress);
+                    localStorage.setItem('heimaFrameWorkLastUpdate', data.lastUpdate);
+                    loadProgress();
+                    showToast('进度已导入！');
+                } catch (err) {
+                    showToast('导入失败：文件格式错误');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetAll() {
+            document.getElementById('resetModal').classList.remove('hidden');
+            document.getElementById('resetModal').classList.add('flex');
+        }
+
+        function closeResetModal() {
+            document.getElementById('resetModal').classList.add('hidden');
+            document.getElementById('resetModal').classList.remove('flex');
+        }
+
+        function confirmReset() {
+            localStorage.removeItem('heimaFrameWorkProgress');
+            localStorage.removeItem('heimaFrameWorkLastUpdate');
+            location.reload();
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProgress();
+        });
+    </script>
+</body>
+</html>
