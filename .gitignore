@@ -11,3 +11,7 @@ heimaSDK_copy/build/
 # IDE
 .vscode/
 .idea/
+
+env
+
+build
