@@ -110,7 +110,7 @@
             <Slave master="0" domain="12" alias="13" type="MT_Device">1</Slave>
             <Slave master="0" domain="13" alias="14" type="MT_Device">1</Slave>
             <Slave master="0" domain="14" alias="15" type="MT_Device">1</Slave>
-            <Slave master="0" domain="15" alias="16" type="MT_Device">1</Slave>
+            <!-- <Slave master="0" domain="15" alias="16" type="MT_Device">1</Slave>
             <Slave master="0" domain="16" alias="17" type="MT_Device">1</Slave>
             <Slave master="0" domain="17" alias="18" type="MT_Device">1</Slave>
             <Slave master="0" domain="18" alias="19" type="MT_Device">1</Slave>
@@ -125,7 +125,7 @@
             <Slave master="0" domain="27" alias="28" type="MT_Device">1</Slave>
             <Slave master="0" domain="28" alias="29" type="MT_Device">1</Slave>
             <Slave master="0" domain="29" alias="30" type="MT_Device">1</Slave>
-            <Slave master="0" domain="30" alias="31" type="MT_Device">1</Slave>
+            <Slave master="0" domain="30" alias="31" type="MT_Device">1</Slave> -->
         </Slaves>
     </ECAT>
 
@@ -133,7 +133,7 @@
         <!-- left leg -->
         <!-- x12 motor -->
         <Motor limb="0" motor="0" alias="1">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>20</GearRatioTor>
@@ -147,7 +147,7 @@
         </Motor>
          <!-- x12 motor -->
         <Motor limb="0" motor="1" alias="2"> 
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>20</GearRatioTor>
@@ -161,7 +161,7 @@
         </Motor>
         <!-- x15 motor -->
         <Motor limb="0" motor="2" alias="3">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>36</GearRatioTor>
@@ -175,7 +175,7 @@
         </Motor>
         <!-- x12 motor -->
         <Motor limb="0" motor="3" alias="4"> 
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>20</GearRatioTor>
@@ -216,10 +216,12 @@
             <MaximumPosition>6.283185</MaximumPosition>
         </Motor>
 
+
+
         <!-- right leg -->
         <!-- x12 motor -->
         <Motor limb="1" motor="0" alias="7">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>20</GearRatioTor>
@@ -233,7 +235,7 @@
         </Motor>
         <!-- x12 motor -->
         <Motor limb="1" motor="1" alias="8"> 
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>20</GearRatioTor>
@@ -301,6 +303,7 @@
             <MinimumPosition>-6.283185</MinimumPosition>
             <MaximumPosition>6.283185</MaximumPosition>
         </Motor>
+
         <!-- waist motors -->
          <Motor limb="4" motor="0" alias="13">
             <Polarity>1</Polarity>
@@ -315,20 +318,7 @@
             <MinimumPosition>-6.283185</MinimumPosition>
             <MaximumPosition>6.283185</MaximumPosition>
         </Motor>
-        <Motor limb="4" motor="1" alias="14">
-            <Polarity>1</Polarity>
-            <CountBias>0</CountBias>
-            <EncoderResolution>131072</EncoderResolution>
-            <GearRatioTor>20</GearRatioTor>
-            <GearRatioPosVel>20</GearRatioPosVel>
-            <RatedCurrent>42.42</RatedCurrent>
-            <TorqueConstant>2.81</TorqueConstant>
-            <RatedTorque>85</RatedTorque>
-            <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
-        </Motor>
-        <Motor limb="4" motor="2" alias="15">
+        <Motor limb="4" motor="2" alias="14">
             <Polarity>1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
@@ -341,6 +331,21 @@
             <MinimumPosition>-6.283185</MinimumPosition>
             <MaximumPosition>6.283185</MaximumPosition>
         </Motor>
+        <Motor limb="4" motor="1" alias="15">
+            <Polarity>1</Polarity>
+            <CountBias>0</CountBias>
+            <EncoderResolution>131072</EncoderResolution>
+            <GearRatioTor>20</GearRatioTor>
+            <GearRatioPosVel>20</GearRatioPosVel>
+            <RatedCurrent>42.42</RatedCurrent>
+            <TorqueConstant>2.81</TorqueConstant>
+            <RatedTorque>85</RatedTorque>
+            <MaximumTorque>320</MaximumTorque>
+            <MinimumPosition>-6.283185</MinimumPosition>
+            <MaximumPosition>6.283185</MaximumPosition>
+        </Motor>
+
+
         <!-- left arm -->
         <Motor limb="2" motor="0" alias="16">
             <Polarity>1</Polarity>
@@ -532,7 +537,7 @@
             <GearRatioTor>36</GearRatioTor>
             <GearRatioPosVel>36</GearRatioPosVel>
             <RatedCurrent>6.1</RatedCurrent>
-            <TorqueConstant>1.9</TorqueConstant>
+            <TorqueConstant>1.2</TorqueConstant>
             <RatedTorque>10.5</RatedTorque>
             <MaximumTorque>34</MaximumTorque>
             <MinimumPosition>-6.283185</MinimumPosition>
@@ -545,7 +550,7 @@
             <GearRatioTor>36</GearRatioTor>
             <GearRatioPosVel>36</GearRatioPosVel>
             <RatedCurrent>6.1</RatedCurrent>
-            <TorqueConstant>1.9</TorqueConstant>
+            <TorqueConstant>1.2</TorqueConstant>
             <RatedTorque>10.5</RatedTorque>
             <MaximumTorque>34</MaximumTorque>
             <MinimumPosition>-6.283185</MinimumPosition>

@@ -122,10 +122,10 @@ if __name__ == "__main__":
     print(f"theta_f: {theta_f}, theta_e: {theta_e}")
 
     # draw df
-    import matplotlib.pyplot as plt
-    df = []
-    for i in np.linspace(-math.pi, math.pi, 100):
-        df.append(ankle_solver.get_CE(0, 0, i))
-    plt.plot(df)
-    plt.show()
+    # import matplotlib.pyplot as plt
+    # df = []
+    # for i in np.linspace(-math.pi, math.pi, 100):
+    #     df.append(ankle_solver.get_CE(0, 0, i))
+    # plt.plot(df)
+    # plt.show()
 
