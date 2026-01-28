@@ -82,8 +82,8 @@ const float PD_KD[15] = {
 //     50.0f, 50.0f, 50.0f
 // };
 const float MAX_TORQUE_LIMIT[15] = {
-    400.0f, 400.0f, 400.0f, 400.0f, 300.0f, 300.0f,  // Left leg
-    400.0f, 400.0f, 400.0f, 400.0f, 300.0f, 300.0f,   // Right leg
+    30.0f, 30.0f, 30.0f, 30.0f, 30.0f, 30.0f,  // Left leg
+    30.0f, 30.0f, 30.0f, 30.0f, 30.0f, 30.0f,   // Right leg
     400.0f, 400.0f, 400.0f
 };
 
@@ -348,8 +348,8 @@ int main(int argc, char** argv) {
     std::cout << "right ankle u" << right_ankle_U << std::endl;
     std::cout << "right ankle d" << right_ankle_D << std::endl;
     
-    // while (!g_stop && hold_ticks < pd_hold_ticks_2) {
-    while (!g_stop) {
+    while (!g_stop && hold_ticks < pd_hold_ticks_2) {
+    // while (!g_stop) {
         sdk.getMotorActual(motor_states);
         
         // Calculate interpolation factor (0.0 = initial, 1.0 = default)
@@ -446,6 +446,10 @@ int main(int argc, char** argv) {
     const int POLICY_PERIOD_US = 20000;  // 20ms in microseconds
     auto last_policy_update = std::chrono::steady_clock::now();
     
+    // PD control update timing (200 Hz = 5ms)
+    const int PD_UPDATE_PERIOD_MS = 5;  // 5ms = 5 iterations at 1kHz
+    int pd_update_counter = 0;
+    
     while (!g_stop) {
         auto cycle_start = std::chrono::steady_clock::now();
         
@@ -490,61 +494,67 @@ int main(int argc, char** argv) {
             policy_count++;
         }
         
-        // Convert actions to joint targets and compute PD torque commands
-        // Action is relative to default pose, scaled by ACTION_SCALE
-        float target_pos[15] = {0.0f};
-        for (int i = 0; i < 15; ++i) {
-            target_pos[i] = DEFAULT_JOINT_ANGLES[i];
-            if (i < 12) {
-                target_pos[i] = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE;
+        // Recalculate PD control every 5ms (200 Hz)
+        if (pd_update_counter == 0) {
+            // Convert actions to joint targets and compute PD torque commands
+            // Action is relative to default pose, scaled by ACTION_SCALE
+            float target_pos[15] = {0.0f};
+            for (int i = 0; i < 15; ++i) {
+                target_pos[i] = DEFAULT_JOINT_ANGLES[i];
+                if (i < 12) {
+                    target_pos[i] = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE;
+                }
+            }
+
+            double left_ankle_pitch = static_cast<double>(target_pos[4]);
+            double left_ankle_roll = static_cast<double>(target_pos[5]);
+            double right_ankle_pitch = static_cast<double>(target_pos[10]);
+            double right_ankle_roll = static_cast<double>(target_pos[11]);
+            auto left_ankle_angles = ankle_solver.solve(-left_ankle_pitch, -left_ankle_roll);
+            auto right_ankle_angles = ankle_solver.solve(-right_ankle_pitch, -right_ankle_roll);
+            double left_ankle_U = left_ankle_angles.second;
+            double left_ankle_D = left_ankle_angles.first;
+            double right_ankle_U = right_ankle_angles.second;
+            double right_ankle_D = right_ankle_angles.first;
+
+            for (int i = 0; i < 15; ++i) {
+                float actual_pos = motor_states[i].pos;
+                float target_vel = 0.0f;  // Target velocity (can be computed from actions if needed)
+                float actual_vel = motor_states[i].vel;
+                
+                // Compute PD torque command
+                if (i==4) target_pos[i] = left_ankle_angles.second;
+                if (i==5) target_pos[i] = left_ankle_angles.first;
+                if (i==10) target_pos[i] = right_ankle_angles.second;
+                if (i==11) target_pos[i] = right_ankle_angles.first;
+                float torqueCmd = pdControl(target_pos[i], actual_pos, target_vel, actual_vel, PD_KP[i], PD_KD[i]);
+                
+                // Safety clip: limit torque command to prevent excessive values
+                float originalTorqueCmd = torqueCmd;
+                if (torqueCmd > MAX_TORQUE_LIMIT[i]) {
+                    torqueCmd = MAX_TORQUE_LIMIT[i];
+                    std::cerr << "WARNING: Torque clipped for motor " << i 
+                              << " (original: " << originalTorqueCmd 
+                              << " N·m, clipped to: " << torqueCmd << " N·m)" << std::endl;
+                } else if (torqueCmd < -MAX_TORQUE_LIMIT[i]) {
+                    torqueCmd = -MAX_TORQUE_LIMIT[i];
+                    std::cerr << "WARNING: Torque clipped for motor " << i 
+                              << " (original: " << originalTorqueCmd 
+                              << " N·m, clipped to: " << torqueCmd << " N·m)" << std::endl;
+                }
+                
+                // Set torque command (for CST mode)
+                motor_commands[i].tor = torqueCmd;
+                motor_commands[i].pos = 0.0f;  // Not used in torque mode
+                motor_commands[i].vel = 0.0f;  // Not used in torque mode
+                motor_commands[i].enabled = 1;
             }
         }
-
-        double left_ankle_pitch = static_cast<double>(target_pos[4]);
-        double left_ankle_roll = static_cast<double>(target_pos[5]);
-        double right_ankle_pitch = static_cast<double>(target_pos[10]);
-        double right_ankle_roll = static_cast<double>(target_pos[11]);
-        auto left_ankle_angles = ankle_solver.solve(-left_ankle_pitch, -left_ankle_roll);
-        auto right_ankle_angles = ankle_solver.solve(-right_ankle_pitch, -right_ankle_roll);
-        double left_ankle_U = left_ankle_angles.second;
-        double left_ankle_D = left_ankle_angles.first;
-        double right_ankle_U = right_ankle_angles.second;
-        double right_ankle_D = right_ankle_angles.first;
-
-        for (int i = 0; i < 15; ++i) {
-
-            float actual_pos = motor_states[i].pos;
-            float target_vel = 0.0f;  // Target velocity (can be computed from actions if needed)
-            float actual_vel = motor_states[i].vel;
-
-
-            
-            // Compute PD torque command
-            if (i==4) target_pos[i] = left_ankle_angles.second;
-            if (i==5) target_pos[i] = left_ankle_angles.first;
-            if (i==10) target_pos[i] = right_ankle_angles.second;
-            if (i==11) target_pos[i] = right_ankle_angles.first;
-            float torqueCmd = pdControl(target_pos[i], actual_pos, target_vel, actual_vel, PD_KP[i], PD_KD[i]);
-            
-            // Safety clip: limit torque command to prevent excessive values
-            float originalTorqueCmd = torqueCmd;
-            if (torqueCmd > MAX_TORQUE_LIMIT[i]) {
-                torqueCmd = MAX_TORQUE_LIMIT[i];
-                std::cerr << "WARNING: Torque clipped for motor " << i 
-                          << " (original: " << originalTorqueCmd 
-                          << " N·m, clipped to: " << torqueCmd << " N·m)" << std::endl;
-            } else if (torqueCmd < -MAX_TORQUE_LIMIT[i]) {
-                torqueCmd = -MAX_TORQUE_LIMIT[i];
-                std::cerr << "WARNING: Torque clipped for motor " << i 
-                          << " (original: " << originalTorqueCmd 
-                          << " N·m, clipped to: " << torqueCmd << " N·m)" << std::endl;
-            }
-            
-            // Set torque command (for CST mode)
-            motor_commands[i].tor = torqueCmd;
-            motor_commands[i].pos = 0.0f;  // Not used in torque mode
-            motor_commands[i].vel = 0.0f;  // Not used in torque mode
-            motor_commands[i].enabled = 1;
+        
+        // Update counter for PD control recalculation (every 5ms)
+        pd_update_counter++;
+        if (pd_update_counter >= PD_UPDATE_PERIOD_MS) {
+            pd_update_counter = 0;
         }
 
         
