@@ -558,7 +558,7 @@ int main(int argc, char** argv) {
         // }
         
         // Send commands (every 1ms for high-frequency control)
-        // sdk.setMotorTarget(motor_commands);  // COMMENTED OUT: Disabled motor command sending
+        sdk.setMotorTarget(motor_commands);  // COMMENTED OUT: Disabled motor command sending
         
         // Timing and statistics
         loop_count++;
