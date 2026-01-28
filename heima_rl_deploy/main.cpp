@@ -42,7 +42,7 @@ const float DEFAULT_JOINT_ANGLES[15] = {
 };
 
 // Action scale (from training config)
-const float ACTION_SCALE = 1.0f;
+const float ACTION_SCALE = 0.25f;
 
 // PD gains (from training config)
 // const float PD_KP[12] = {
