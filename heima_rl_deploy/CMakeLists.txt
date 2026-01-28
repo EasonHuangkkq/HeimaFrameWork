@@ -21,6 +21,7 @@ find_library(ETHERCAT_LIB ethercat
 )
 
 find_package(Threads REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 # ONNX Runtime library path - detect architecture
 if(${CMAKE_CXX_COMPILER} MATCHES "aarch64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
@@ -82,6 +83,19 @@ target_include_directories(onnx_wrapper PUBLIC
     ${PROJECT_SOURCE_DIR}/../loong_ctrl_locomotion-main/third_party/include/onnxruntime
 )
 
+# Build ankle solver library
+add_library(ankle_solver STATIC
+    ankle_solver/cpp/ankle_solver.cpp
+)
+
+target_link_libraries(ankle_solver PUBLIC
+    Eigen3::Eigen
+)
+
+target_include_directories(ankle_solver PUBLIC
+    ${PROJECT_SOURCE_DIR}
+)
+
 # Build main executable
 add_executable(heima_rl_deploy
     main.cpp
@@ -90,6 +104,7 @@ add_executable(heima_rl_deploy
 target_link_libraries(heima_rl_deploy PUBLIC
     driver_sdk
     onnx_wrapper
+    ankle_solver
     onnxruntime
     Threads::Threads
     m

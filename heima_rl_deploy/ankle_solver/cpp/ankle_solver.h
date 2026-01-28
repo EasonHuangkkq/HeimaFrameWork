@@ -7,8 +7,7 @@
 
 class AnkleSolver {
 public:
-    AnkleSolver(double l1, double d1, double m, double n, 
-                double h1, double h2, double r_E, double r_F);
+    AnkleSolver();
     
     // Solve for theta_f and theta_e given pitch and roll
     std::pair<double, double> solve(double pitch, double roll);
@@ -36,7 +35,6 @@ public:
                                                  double pitch, double roll);
 
 private:
-    double l1, d1, m, n, h1, h2, r_E, r_F;
     
     // Calculate distance between two 3D coordinates
     double get_distance(const Eigen::Vector3d& coord1, const Eigen::Vector3d& coord2);

@@ -7,6 +7,7 @@
 
 #include "heima_driver_sdk.h"
 #include "onnx_wrapper.h"
+#include "ankle_solver/cpp/ankle_solver.h"
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -51,7 +52,8 @@ const float ACTION_SCALE = 1.0f;
 
 // const float PD_KD[12] = {
 //     1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,  // Right leg
-//     1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f   // Left leg
+//     1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,   // Left leg
+//     1.0f, 1.0f, 1.0f
 // };
 
 
@@ -61,24 +63,29 @@ const float PD_KP[15] = {
     150.0f, 150.0f, 150.0f, 200.0f, 60.0f, 60.0f,   // Right leg
     200.0f, 200.0f, 200.0f
 };
+// const float PD_KP[15] = {
+//     30.0f, 30.0f, 30.0f, 40.0f, 20.0f, 20.0f,  // Left leg
+//     30.0f, 30.0f, 30.0f, 40.0f, 20.0f, 20.0f,   // Right leg
+//     8.0f, 8.0f, 8.0f
+// };
 
 const float PD_KD[15] = {
-    1.0f, 1.0f, 1.0f, 2.0f, 1.0f, 1.0f,  // Left leg
-    1.0f, 1.0f, 1.0f, 2.0f, 1.0f, 1.0f,   // Right leg
+    1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,  // Left leg
+    1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,   // Right leg
     1.0f, 1.0f, 1.0f
 };
 
 // Maximum torque limits for each motor (N·m)
-const float MAX_TORQUE_LIMIT[15] = {
-    30.0f, 20.0f, 30.0f, 30.0f, 2.0f, 2.0f,  // Left leg
-    30.0f, 20.0f, 30.0f, 30.0f, 2.0f, 2.0f,   // Right leg
-    50.0f, 50.0f, 50.0f
-};
 // const float MAX_TORQUE_LIMIT[15] = {
-//     5.0f, 5.0f, 5.0f, 5.0f, 5.0f, 5.0f,  // Left leg
-//     5.0f, 5.0f, 5.0f, 5.0f, 5.0f, 5.0f,   // Right leg
-//     5.0f, 5.0f, 5.0f
+//     30.0f, 20.0f, 30.0f, 30.0f, 30.0f, 30.0f,  // Left leg
+//     30.0f, 20.0f, 30.0f, 30.0f, 30.0f, 30.0f,   // Right leg
+//     50.0f, 50.0f, 50.0f
 // };
+const float MAX_TORQUE_LIMIT[15] = {
+    400.0f, 400.0f, 400.0f, 400.0f, 300.0f, 300.0f,  // Left leg
+    400.0f, 400.0f, 400.0f, 400.0f, 300.0f, 300.0f,   // Right leg
+    400.0f, 400.0f, 400.0f
+};
 
 // PD Control function
 float pdControl(float targetPos, float actualPos, float targetVel, float actualVel, float kp, float kd) {
@@ -115,7 +122,7 @@ void rotateInverse(const float R[9], const float v[3], float result[3]) {
     result[2] = R[2] * v[0] + R[5] * v[1] + R[8] * v[2];
 }
 
-// Build observation vector (48 dimensions)
+// Build observation vector (45 dimensions)
 void buildObservation(
     const DriverSDK::imuStruct& imu,
     const std::vector<DriverSDK::motorActualStruct>& motor_states,
@@ -123,7 +130,7 @@ void buildObservation(
     const std::vector<float>& previous_actions,
     std::vector<float>& obs
 ) {
-    obs.resize(48);
+    obs.resize(45);
     int idx = 0;
     
     // Note: We need base linear velocity, but SDK doesn't provide it directly
@@ -132,14 +139,20 @@ void buildObservation(
     float base_lin_vel[3] = {0.0f, 0.0f, 0.0f};  // TODO: Estimate from odometry
     
     // 1. Base linear velocity (scaled) - 3 dims
-    obs[idx++] = base_lin_vel[0] * LIN_VEL_SCALE;
-    obs[idx++] = base_lin_vel[1] * LIN_VEL_SCALE;
-    obs[idx++] = base_lin_vel[2] * LIN_VEL_SCALE;
+    // obs[idx++] = base_lin_vel[0] * LIN_VEL_SCALE;
+    // obs[idx++] = base_lin_vel[1] * LIN_VEL_SCALE;
+    // obs[idx++] = base_lin_vel[2] * LIN_VEL_SCALE;
     
     // 2. Base angular velocity (scaled) - 3 dims
-    obs[idx++] = imu.gyr[0] * ANG_VEL_SCALE;
-    obs[idx++] = imu.gyr[1] * ANG_VEL_SCALE;
-    obs[idx++] = imu.gyr[2] * ANG_VEL_SCALE;
+    float angular_velocity[3] = {0.0f, 0.0f, 0.0f}; 
+    angular_velocity[0] = imu.gyr[0];
+    angular_velocity[1] =  imu.gyr[1]; 
+    angular_velocity[2] =  imu.gyr[2]; 
+
+    obs[idx++] = angular_velocity[0] * ANG_VEL_SCALE;
+    obs[idx++] = angular_velocity[1] * ANG_VEL_SCALE;
+    obs[idx++] = angular_velocity[2] * ANG_VEL_SCALE;
+
     
     // 3. Projected gravity - 3 dims
     // Compute rotation matrix from RPY
@@ -231,6 +244,11 @@ int main(int argc, char** argv) {
     // Will be set later after motors are operational
     std::vector<char> modes(motor_count, 8);
     
+    // Initialize ankle solver
+    std::cout << "\nInitializing ankle solver..." << std::endl;
+    AnkleSolver ankle_solver;
+    std::cout << "Ankle solver initialized." << std::endl;
+    
     // Initialize ONNX model
     std::cout << "\nLoading ONNX model..." << std::endl;
     OnnxWrapper onnx;
@@ -239,8 +257,8 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    if (onnx.getInputSize() != 48) {
-        std::cerr << "Error: Model expects input size 48, got " << onnx.getInputSize() << std::endl;
+    if (onnx.getInputSize() != 45) {
+        std::cerr << "Error: Model expects input size 45, got " << onnx.getInputSize() << std::endl;
         return 1;
     }
     
@@ -254,7 +272,7 @@ int main(int argc, char** argv) {
     std::vector<DriverSDK::motorActualStruct> motor_states(motor_count);
     DriverSDK::imuStruct imu_data;
     
-    std::vector<float> observation(48);
+    std::vector<float> observation(45);
     std::vector<float> actions(12, 0.0f);
     std::vector<float> previous_actions(12, 0.0f);
     
@@ -307,6 +325,7 @@ int main(int argc, char** argv) {
     // Stage 2: Hold motors at default position using PD control
     std::cout << "\nStage 2: Holding motors at default position with PD control..." << std::endl;
     const int pd_hold_ticks = 5000;  // Hold for 1 second (1000ms)
+    const int pd_hold_ticks_2 = 10000; // Hold for another 1 second
     int hold_ticks = 0;
     
     // Record initial positions for interpolation
@@ -315,9 +334,22 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 15; ++i) {
         initial_positions[i] = motor_states[i].pos;
     }
+
+    double left_ankle_pitch = static_cast<double>(DEFAULT_JOINT_ANGLES[4]);
+    double left_ankle_roll = static_cast<double>(DEFAULT_JOINT_ANGLES[5]);
+    double right_ankle_pitch = static_cast<double>(DEFAULT_JOINT_ANGLES[10]);
+    double right_ankle_roll = static_cast<double>(DEFAULT_JOINT_ANGLES[11]);
+    auto left_ankle_angles = ankle_solver.solve(-left_ankle_pitch, -left_ankle_roll);
+    auto right_ankle_angles = ankle_solver.solve(-right_ankle_pitch, -right_ankle_roll);
+    double left_ankle_U = left_ankle_angles.second;
+    double left_ankle_D = left_ankle_angles.first;
+    double right_ankle_U = right_ankle_angles.second;
+    double right_ankle_D = right_ankle_angles.first;
+    std::cout << "right ankle u" << right_ankle_U << std::endl;
+    std::cout << "right ankle d" << right_ankle_D << std::endl;
     
-    while (!g_stop && hold_ticks < pd_hold_ticks) {
-    // while (!g_stop) {
+    // while (!g_stop && hold_ticks < pd_hold_ticks_2) {
+    while (!g_stop) {
         sdk.getMotorActual(motor_states);
         
         // Calculate interpolation factor (0.0 = initial, 1.0 = default)
@@ -328,11 +360,17 @@ int main(int argc, char** argv) {
             if (alpha < 0.0f) alpha = 0.0f;
             if (alpha > 1.0f) alpha = 1.0f;
         }
-        
+
+
         // Apply PD control to hold motors at default position (torque mode)
         for (int i = 0; i < 15; ++i) {
+            float temp = DEFAULT_JOINT_ANGLES[i];
+            if (i==4) temp = left_ankle_angles.second;
+            if (i==5) temp = left_ankle_angles.first;
+            if (i==10) temp = right_ankle_angles.second;
+            if (i==11) temp = right_ankle_angles.first;
             // Interpolate from initial position to default position
-            float targetPos = initial_positions[i] * (1.0f - alpha) + DEFAULT_JOINT_ANGLES[i] * alpha;
+            float targetPos = initial_positions[i] * (1.0f - alpha) + temp * alpha;
             float actualPos = motor_states[i].pos;
             float targetVel = 0.0f;
             float actualVel = motor_states[i].vel;
@@ -344,20 +382,20 @@ int main(int argc, char** argv) {
             float originalTorqueCmd = torqueCmd;
             if (torqueCmd > MAX_TORQUE_LIMIT[i]) {
                 torqueCmd = MAX_TORQUE_LIMIT[i];
-                std::cerr << "WARNING: Torque clipped for motor " << i 
-                          << " (original: " << originalTorqueCmd 
-                          << " N·m, clipped to: " << torqueCmd << " N·m)" << std::endl;
+                // std::cerr << "WARNING: Torque clipped for motor " << i 
+                //           << " (original: " << originalTorqueCmd 
+                //           << " N·m, clipped to: " << torqueCmd << " N·m)" << std::endl;
             } else if (torqueCmd < -MAX_TORQUE_LIMIT[i]) {
                 torqueCmd = -MAX_TORQUE_LIMIT[i];
-                std::cerr << "WARNING: Torque clipped for motor " << i 
-                          << " (original: " << originalTorqueCmd 
-                          << " N·m, clipped to: " << torqueCmd << " N·m)" << std::endl;
+                // std::cerr << "WARNING: Torque clipped for motor " << i 
+                //           << " (original: " << originalTorqueCmd 
+                //           << " N·m, clipped to: " << torqueCmd << " N·m)" << std::endl;
             }
 
             // print out torque
-            std::cout << "torqueCmd" << i << ": "<< torqueCmd << std::endl;
-            std::cout << "targetPos" << i << ": "<< DEFAULT_JOINT_ANGLES[i] << std::endl;
-            std::cout << "actualPos" << i << ": "<< motor_states[i].pos << std::endl;
+            // std::cout << "torqueCmd" << i << ": "<< torqueCmd << std::endl;
+            // std::cout << "targetPos" << i << ": "<< DEFAULT_JOINT_ANGLES[i] << std::endl;
+            // std::cout << "actualPos" << i << ": "<< motor_states[i].pos << std::endl;
             
             // Set torque command (for CST mode)
             // if (i == 1 || i == 7) {
@@ -414,13 +452,13 @@ int main(int argc, char** argv) {
         // Read sensors (every 1ms for high-frequency feedback)
         sdk.getMotorActual(motor_states);
         sdk.getIMU(imu_data);
-        // print IMU
-        std::cout << "IMU: " << "roll=" << imu_data.rpy[0] << " pitch=" << imu_data.rpy[1] << " yaw=" << imu_data.rpy[2] << std::endl;
-        // print states of each motor
-        std::cout << "Motor states: " << std::endl;
-        for (int i = 0; i < motor_count; ++i) {
-            std::cout << "Motor " << i << ": " << "pos=" << motor_states[i].pos << " vel=" << motor_states[i].vel << " tor=" << motor_states[i].tor << " statusWord=" << motor_states[i].statusWord << " errorCode=" << motor_states[i].errorCode << std::endl;
-        }
+        // // print IMU
+        // std::cout << "IMU: " << "roll=" << imu_data.rpy[0] << " pitch=" << imu_data.rpy[1] << " yaw=" << imu_data.rpy[2] << std::endl;
+        // // print states of each motor
+        // std::cout << "Motor states: " << std::endl;
+        // for (int i = 0; i < motor_count; ++i) {
+        //     std::cout << "Motor " << i << ": " << "pos=" << motor_states[i].pos << " vel=" << motor_states[i].vel << " tor=" << motor_states[i].tor << " statusWord=" << motor_states[i].statusWord << " errorCode=" << motor_states[i].errorCode << std::endl;
+        // }
         
         // Check if it's time to update policy (50 Hz)
         auto now = std::chrono::steady_clock::now();
@@ -433,12 +471,12 @@ int main(int argc, char** argv) {
             
             // Run neural network inference (50 Hz)
             // print observation
-            std::cout << "observation: [";
-            for (size_t i = 0; i < observation.size(); ++i) {
-                std::cout << observation[i];
-                if (i < observation.size() - 1) std::cout << ", ";
-            }
-            std::cout << "]" << std::endl;
+            // std::cout << "observation: [";
+            // for (size_t i = 0; i < observation.size(); ++i) {
+            //     std::cout << observation[i];
+            //     if (i < observation.size() - 1) std::cout << ", ";
+            // }
+            // std::cout << "]" << std::endl;
 
             if (!onnx.run(observation, actions)) {
                 std::cerr << "Inference failed!" << std::endl;
@@ -454,17 +492,39 @@ int main(int argc, char** argv) {
         
         // Convert actions to joint targets and compute PD torque commands
         // Action is relative to default pose, scaled by ACTION_SCALE
+        float target_pos[15] = {0.0f};
         for (int i = 0; i < 15; ++i) {
-            float target_pos = DEFAULT_JOINT_ANGLES[i];
+            target_pos[i] = DEFAULT_JOINT_ANGLES[i];
             if (i < 12) {
-                target_pos = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE;
+                target_pos[i] = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE;
             }
+        }
+
+        double left_ankle_pitch = static_cast<double>(target_pos[4]);
+        double left_ankle_roll = static_cast<double>(target_pos[5]);
+        double right_ankle_pitch = static_cast<double>(target_pos[10]);
+        double right_ankle_roll = static_cast<double>(target_pos[11]);
+        auto left_ankle_angles = ankle_solver.solve(-left_ankle_pitch, -left_ankle_roll);
+        auto right_ankle_angles = ankle_solver.solve(-right_ankle_pitch, -right_ankle_roll);
+        double left_ankle_U = left_ankle_angles.second;
+        double left_ankle_D = left_ankle_angles.first;
+        double right_ankle_U = right_ankle_angles.second;
+        double right_ankle_D = right_ankle_angles.first;
+
+        for (int i = 0; i < 15; ++i) {
+
             float actual_pos = motor_states[i].pos;
             float target_vel = 0.0f;  // Target velocity (can be computed from actions if needed)
             float actual_vel = motor_states[i].vel;
+
+
             
             // Compute PD torque command
-            float torqueCmd = pdControl(target_pos, actual_pos, target_vel, actual_vel, PD_KP[i], PD_KD[i]);
+            if (i==4) target_pos[i] = left_ankle_angles.second;
+            if (i==5) target_pos[i] = left_ankle_angles.first;
+            if (i==10) target_pos[i] = right_ankle_angles.second;
+            if (i==11) target_pos[i] = right_ankle_angles.first;
+            float torqueCmd = pdControl(target_pos[i], actual_pos, target_vel, actual_vel, PD_KP[i], PD_KD[i]);
             
             // Safety clip: limit torque command to prevent excessive values
             float originalTorqueCmd = torqueCmd;
@@ -489,20 +549,20 @@ int main(int argc, char** argv) {
 
         
         // print out command
-        std::cout << "Motor commands: " << std::endl;
-        for (int i = 0; i < motor_count; ++i) {
-            std::cout << "Motor " << i << ": " << "tor=" << motor_commands[i].tor 
-                      << " pos=" << motor_commands[i].pos 
-                      << " vel=" << motor_commands[i].vel 
-                      << " enabled=" << motor_commands[i].enabled << std::endl;
-        }
+        // std::cout << "Motor commands: " << std::endl;
+        // for (int i = 0; i < motor_count; ++i) {
+        //     std::cout << "Motor " << i << ": " << "tor=" << motor_commands[i].tor 
+        //               << " pos=" << motor_commands[i].pos 
+        //               << " vel=" << motor_commands[i].vel 
+        //               << " enabled=" << motor_commands[i].enabled << std::endl;
+        // }
         
         // Send commands (every 1ms for high-frequency control)
-        sdk.setMotorTarget(motor_commands);  // COMMENTED OUT: Disabled motor command sending
+        // sdk.setMotorTarget(motor_commands);  // COMMENTED OUT: Disabled motor command sending
         
         // Timing and statistics
         loop_count++;
-        if (loop_count % 1000 == 0) {
+        if (loop_count % 100 == 0) {
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 now - loop_start).count();
             float avg_freq = 1000.0f * loop_count / elapsed;
@@ -512,7 +572,9 @@ int main(int argc, char** argv) {
                       << " | EtherCAT freq: " << avg_freq << " Hz"
                       << " | Policy freq: " << policy_freq << " Hz"
                       << " | Roll: " << imu_data.rpy[0]
-                      << " | Pitch: " << imu_data.rpy[1] << std::endl;
+                      << " | Pitch: " << imu_data.rpy[1]
+                      << " | Yaw: " << imu_data.rpy[2] 
+                      << std::endl;
         }
         
         // Maintain 1kHz loop rate (EtherCAT communication)

@@ -194,8 +194,8 @@
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
             <GearRatioPosVel>19.612</GearRatioPosVel>
-            <RatedCurrent>9.5</RatedCurrent>
-            <TorqueConstant>2.1</TorqueConstant>
+            <RatedCurrent>13.4</RatedCurrent>
+            <TorqueConstant>1.5</TorqueConstant>
             <RatedTorque>20</RatedTorque>
             <MaximumTorque>60</MaximumTorque>
             <MinimumPosition>-6.283185</MinimumPosition>
@@ -208,8 +208,8 @@
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
             <GearRatioPosVel>19.612</GearRatioPosVel>
-            <RatedCurrent>9.5</RatedCurrent>
-            <TorqueConstant>2.1</TorqueConstant>
+            <RatedCurrent>13.4</RatedCurrent>
+            <TorqueConstant>1.5</TorqueConstant>
             <RatedTorque>20</RatedTorque>
             <MaximumTorque>60</MaximumTorque>
             <MinimumPosition>-6.283185</MinimumPosition>
@@ -277,13 +277,13 @@
         </Motor>
         <!-- x6 motor -->
         <Motor limb="1" motor="4" alias="11">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
             <GearRatioPosVel>19.612</GearRatioPosVel>
-            <RatedCurrent>9.5</RatedCurrent>
-            <TorqueConstant>2.1</TorqueConstant>
+            <RatedCurrent>13.4</RatedCurrent>
+            <TorqueConstant>1.5</TorqueConstant>
             <RatedTorque>20</RatedTorque>
             <MaximumTorque>60</MaximumTorque>
             <MinimumPosition>-6.283185</MinimumPosition>
@@ -296,8 +296,8 @@
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
             <GearRatioPosVel>19.612</GearRatioPosVel>
-            <RatedCurrent>9.5</RatedCurrent>
-            <TorqueConstant>2.1</TorqueConstant>
+            <RatedCurrent>13.4</RatedCurrent>
+            <TorqueConstant>1.5</TorqueConstant>
             <RatedTorque>20</RatedTorque>
             <MaximumTorque>60</MaximumTorque>
             <MinimumPosition>-6.283185</MinimumPosition>

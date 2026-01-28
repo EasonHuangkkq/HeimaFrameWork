@@ -62,10 +62,6 @@ def convert_pytorch_to_onnx(input_path, output_path, input_size=48, output_size=
             do_constant_folding=True,      # Execute constant folding optimization
             input_names=['observations'],   # Input tensor name
             output_names=['actions'],      # Output tensor name
-            dynamic_axes={
-                'observations': {0: 'batch_size'},  # Variable batch size
-                'actions': {0: 'batch_size'}
-            },
             verbose=False
         )
         print(f"✓ ONNX model exported successfully to: {output_path}")
@@ -121,7 +117,7 @@ def main():
     parser.add_argument(
         '--input-size',
         type=int,
-        default=48,
+        default=45,
         help='Expected input observation size (default: 48 for heima_noarm)'
     )
     parser.add_argument(

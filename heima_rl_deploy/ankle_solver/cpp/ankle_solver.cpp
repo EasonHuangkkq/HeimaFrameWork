@@ -2,9 +2,7 @@
 #include <iostream>
 #include <iomanip>
 
-AnkleSolver::AnkleSolver(double l1, double d1, double m, double n, 
-                         double h1, double h2, double r_E, double r_F)
-    : l1(l1), d1(d1), m(m), n(n), h1(h1), h2(h2), r_E(r_E), r_F(r_F) {
+AnkleSolver::AnkleSolver() {
 }
 
 double AnkleSolver::get_distance(const Eigen::Vector3d& coord1, const Eigen::Vector3d& coord2) {
@@ -35,26 +33,26 @@ Eigen::Vector3d AnkleSolver::get_coord_after_pitch_roll(const Eigen::Vector3d& c
 }
 
 Eigen::Vector3d AnkleSolver::get_D_after_rotation(double pitch, double roll) {
-    Eigen::Vector3d temp_d(-69, -35, -25.06);
+    Eigen::Vector3d temp_d(-69, -35, 0);
     return get_coord_after_pitch_roll(temp_d, pitch, roll);
 }
 
 Eigen::Vector3d AnkleSolver::get_C_after_rotation(double pitch, double roll) {
-    Eigen::Vector3d temp_c(-69, 35, -25.06);
+    Eigen::Vector3d temp_c(-69, 35, 0);
     return get_coord_after_pitch_roll(temp_c, pitch, roll);
 }
 
 Eigen::Vector3d AnkleSolver::get_E(double theta) {
-    Eigen::Vector3d temp(-r_E, d1, 0);
+    Eigen::Vector3d temp(-65, 0, 0);
     temp = apply_rotation_y(temp, theta);
-    temp = temp + Eigen::Vector3d(-22, 0, n);
+    temp = temp + Eigen::Vector3d(-22, 34.5, 313.837);
     return temp;
 }
 
 Eigen::Vector3d AnkleSolver::get_F(double theta) {
-    Eigen::Vector3d temp(-r_F, -d1, 0);
+    Eigen::Vector3d temp(-65, 0, 0);
     temp = apply_rotation_y(temp, theta);
-    temp = temp + Eigen::Vector3d(-22, 0, m);
+    temp = temp + Eigen::Vector3d(-12, -34.5, 232.273);
     return temp;
 }
 
@@ -105,23 +103,23 @@ double AnkleSolver::fsolve(std::function<double(double)> func, double initial_gu
 }
 
 std::pair<double, double> AnkleSolver::solve(double pitch, double roll) {
-    // Solve for theta_f
+    // Solve for theta_f: constraint is distance(D_after_rotation, F(theta_f)) - 232.273
     auto constraint_equation_f = [this, pitch, roll](double theta_f) {
-        return get_distance(get_D_after_rotation(pitch, roll), get_F(theta_f)) - h1;
+        return get_distance(get_D_after_rotation(pitch, roll), get_F(theta_f)) - 232.273;
     };
     
     double theta_f = fsolve(constraint_equation_f, 0.0);
-    std::cout << "theta_f: " << theta_f << std::endl;
-    std::cout << "constraint_equation(theta_f): " << constraint_equation_f(theta_f) << std::endl;
+    // std::cout << "theta_f: " << theta_f << std::endl;
+    // std::cout << "constraint_equation(theta_f): " << constraint_equation_f(theta_f) << std::endl;
     
-    // Solve for theta_e
+    // Solve for theta_e: constraint is distance(E(theta_e), C_after_rotation) - 313.837
     auto constraint_equation_e = [this, pitch, roll](double theta_e) {
-        return get_distance(get_E(theta_e), get_C_after_rotation(pitch, roll)) - h2;
+        return get_distance(get_E(theta_e), get_C_after_rotation(pitch, roll)) - 313.837;
     };
     
     double theta_e = fsolve(constraint_equation_e, 0.0);
-    std::cout << "theta_e: " << theta_e << std::endl;
-    std::cout << "constraint_equation(theta_e): " << constraint_equation_e(theta_e) << std::endl;
+    // std::cout << "theta_e: " << theta_e << std::endl;
+    // std::cout << "constraint_equation(theta_e): " << constraint_equation_e(theta_e) << std::endl;
     
     return std::make_pair(theta_f, theta_e);
 }
