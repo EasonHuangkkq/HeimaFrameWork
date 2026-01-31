@@ -36,8 +36,8 @@ const float CMD_SCALE[3] = {2.0f, 2.0f, 0.25f};
 
 // TESTING
 const float DEFAULT_JOINT_ANGLES[15] = {
-    0.0f, 0.0f, 0.2f, -0.43f, 0.0f, 0.0f,  // Left leg
-    0.0f, 0.0f, 0.2f, -0.43f, 0.0f, 0.0f,   // Right leg
+    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,  // Left leg
+    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,   // Right leg
     0.0f, 0.0f, 0.0f
 };
 
@@ -59,8 +59,8 @@ const float ACTION_SCALE = 0.25f;
 
 // TESTING
 const float PD_KP[15] = {
-    150.0f, 150.0f, 150.0f, 200.0f, 60.0f, 60.0f,  // Left leg
-    150.0f, 150.0f, 150.0f, 200.0f, 60.0f, 60.0f,   // Right leg
+    80.0f, 80.0f, 80.0f, 120.0f, 40.0f, 40.0f,  // Left leg
+    80.0f, 80.0f, 80.0f, 120.0f, 40.0f, 40.0f,   // Right leg
     200.0f, 200.0f, 200.0f
 };
 // const float PD_KP[15] = {
@@ -70,8 +70,8 @@ const float PD_KP[15] = {
 // };
 
 const float PD_KD[15] = {
-    1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,  // Left leg
-    1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,   // Right leg
+    1.0f, 1.0f, 1.0f, 2.0f, 1.0f, 1.0f,  // Left leg
+    1.0f, 1.0f, 1.0f, 2.0f, 1.0f, 1.0f,   // Right leg
     1.0f, 1.0f, 1.0f
 };
 
@@ -486,6 +486,17 @@ int main(int argc, char** argv) {
                 std::cerr << "Inference failed!" << std::endl;
                 break;
             }
+
+            // switch THE LEG ORDER IN ACTION
+            std::vector<float> tmp(6, 0.0f);
+            for (int i=0; i<6; ++i) {
+                tmp[i] = actions[i];
+                actions[i] = actions[i+6];
+            }
+            for (int i=6; i<12; ++i) {
+                actions[i] = tmp[i-6];
+            }
+
             
             // Update previous actions
             previous_actions = actions;
