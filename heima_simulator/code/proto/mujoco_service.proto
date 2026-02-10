@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package mujoco;
+
+// Service for MuJoCo simulation control
+service MuJoCoService {
+    // Fetch observation from MuJoCo
+    rpc FetchObs(FetchObsRequest) returns (FetchObsResponse);
+    
+    // Write torque commands to MuJoCo
+    rpc WriteTorque(WriteTorqueRequest) returns (WriteTorqueResponse);
+}
+
+// Request to fetch observation
+message FetchObsRequest {
+    // Empty - no parameters needed
+}
+
+// Response with observation data
+message FetchObsResponse {
+    repeated float rpy = 1;           // 3 elements (roll, pitch, yaw)
+    repeated float base_ang_vel = 2;  // 3 elements
+    repeated float joint_pos = 3;     // 12 elements
+    repeated float joint_vel = 4;     // 12 elements
+}
+
+// Request to write torque
+message WriteTorqueRequest {
+    repeated float torques = 1;  // 12 elements
+}
+
+// Response for write torque
+message WriteTorqueResponse {
+    bool success = 1;
+}
+
