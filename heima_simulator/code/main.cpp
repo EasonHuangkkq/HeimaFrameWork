@@ -26,44 +26,44 @@ void handleSignal(int) {
 }
 
 // Ankle solver configuration
-const bool USE_ANKLE_SOLVER = false;  // Set to true to enable ankle kinematics correction
+const bool USE_ANKLE_SOLVER = true;  // Set to true to enable ankle kinematics correction
 
 // Apply ankle solver to transform desired ankle pitch/roll into actual motor angles
 void applyAnkleSolver(float target_pos[15], AnkleSolver& ankle_solver) {
     if (!USE_ANKLE_SOLVER) return;
     
-    // Left leg ankle (indices 4=pitch, 5=roll)
-    double left_ankle_pitch = static_cast<double>(target_pos[4]);
-    double left_ankle_roll = static_cast<double>(target_pos[5]);
-    auto left_ankle_angles = ankle_solver.solve(-left_ankle_pitch, -left_ankle_roll);
-    target_pos[4] = left_ankle_angles.second;  // theta_f -> pitch motor
-    target_pos[5] = left_ankle_angles.first;   // theta_e -> roll motor
-    
-    // Right leg ankle (indices 10=pitch, 11=roll)
-    double right_ankle_pitch = static_cast<double>(target_pos[10]);
-    double right_ankle_roll = static_cast<double>(target_pos[11]);
+    // right leg ankle (indices 4=pitch, 5=roll)
+    double right_ankle_pitch = static_cast<double>(target_pos[4]);
+    double right_ankle_roll = static_cast<double>(target_pos[5]);
     auto right_ankle_angles = ankle_solver.solve(-right_ankle_pitch, -right_ankle_roll);
-    target_pos[10] = right_ankle_angles.second; // theta_f -> pitch motor
-    target_pos[11] = right_ankle_angles.first;  // theta_e -> roll motor
+    target_pos[4] = right_ankle_angles.second;  // theta_f -> pitch motor
+    target_pos[5] = right_ankle_angles.first;   // theta_e -> roll motor
+    
+    // left leg ankle (indices 10=pitch, 11=roll)
+    double left_ankle_pitch = static_cast<double>(target_pos[10]);
+    double left_ankle_roll = static_cast<double>(target_pos[11]);
+    auto left_ankle_angles = ankle_solver.solve(-left_ankle_pitch, -left_ankle_roll);
+    target_pos[10] = left_ankle_angles.second; // theta_f -> pitch motor
+    target_pos[11] = left_ankle_angles.first;  // theta_e -> roll motor
 }
 
 // Apply inverse ankle solver to convert motor angles back to ankle pitch/roll for observation
 void applyAnkleSolverInverse(std::vector<float>& joint_pos, AnkleSolver& ankle_solver) {
     if (!USE_ANKLE_SOLVER) return;
     
-    // Left leg ankle (indices 4=pitch motor, 5=roll motor)
-    double left_theta_e = static_cast<double>(joint_pos[5]);  // roll motor angle
-    double left_theta_f = static_cast<double>(joint_pos[4]);  // pitch motor angle
-    auto left_ankle_angles = ankle_solver.solve_inverse(left_theta_e, left_theta_f);
-    joint_pos[4] = -left_ankle_angles.first;   // pitch angle
-    joint_pos[5] = -left_ankle_angles.second;  // roll angle
-    
-    // Right leg ankle (indices 10=pitch motor, 11=roll motor)
-    double right_theta_e = static_cast<double>(joint_pos[11]);  // roll motor angle
-    double right_theta_f = static_cast<double>(joint_pos[10]);  // pitch motor angle
+    // right leg ankle (indices 4=pitch motor, 5=roll motor)
+    double right_theta_e = static_cast<double>(joint_pos[4]);  // roll motor angle
+    double right_theta_f = static_cast<double>(joint_pos[5]);  // pitch motor angle
     auto right_ankle_angles = ankle_solver.solve_inverse(right_theta_e, right_theta_f);
-    joint_pos[10] = -right_ankle_angles.first;   // pitch angle
-    joint_pos[11] = -right_ankle_angles.second;  // roll angle
+    joint_pos[4] = -right_ankle_angles.first;   // pitch angle
+    joint_pos[5] = -right_ankle_angles.second;  // roll angle
+    
+    // left leg ankle (indices 10=pitch motor, 11=roll motor)
+    double left_theta_e = static_cast<double>(joint_pos[10]);  // roll motor angle
+    double left_theta_f = static_cast<double>(joint_pos[11]);  // pitch motor angle
+    auto left_ankle_angles = ankle_solver.solve_inverse(left_theta_e, left_theta_f);
+    joint_pos[10] = -left_ankle_angles.first;   // pitch angle
+    joint_pos[11] = -left_ankle_angles.second;  // roll angle
 }
 
 // Observation scaling factors (from training config)
@@ -81,8 +81,8 @@ const float CMD_SCALE[3] = {2.0f, 2.0f, 0.25f};
 
 // TESTING
 const float DEFAULT_JOINT_ANGLES[15] = {
-    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,  // Left leg
-    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,   // Right leg
+    0.0f, 0.0f, 0.0f, 0.0f, 0.3f, -0.3f,  // Right leg
+    0.0f, 0.0f, 0.0f, 0.0f, 0.3f, 0.3f,   // Left leg
     0.0f, 0.0f, 0.0f
 };
 
@@ -121,16 +121,16 @@ const float PD_KD[15] = {
 };
 
 // Maximum torque limits for each motor (N·m)
-// const float MAX_TORQUE_LIMIT[15] = {
-//     30.0f, 20.0f, 30.0f, 30.0f, 30.0f, 30.0f,  // Left leg
-//     30.0f, 20.0f, 30.0f, 30.0f, 30.0f, 30.0f,   // Right leg
-//     50.0f, 50.0f, 50.0f
-// };
 const float MAX_TORQUE_LIMIT[15] = {
-    3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
-    3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,   // Right leg
-    400.0f, 400.0f, 400.0f
+    30.0f, 20.0f, 30.0f, 30.0f, 30.0f, 30.0f,  // Left leg
+    30.0f, 20.0f, 30.0f, 30.0f, 30.0f, 30.0f,   // Right leg
+    50.0f, 50.0f, 50.0f
 };
+// const float MAX_TORQUE_LIMIT[15] = {
+//     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
+//     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,   // Right leg
+//     400.0f, 400.0f, 400.0f
+// };
 
 // PD Control function
 float pdControl(float targetPos, float actualPos, float targetVel, float actualVel, float kp, float kd) {
@@ -358,6 +358,7 @@ int main(int argc, char** argv) {
             std::cerr << "Failed to fetch initial state" << std::endl;
             return 1;
         }
+        applyAnkleSolverInverse(joint_pos, ankle_solver);
         
         // Store initial positions for interpolation
         std::vector<float> initial_positions = joint_pos;
@@ -372,6 +373,7 @@ int main(int argc, char** argv) {
                 std::cerr << "Failed to fetch state during initialization" << std::endl;
                 return 1;
             }
+
             
             // Calculate interpolation factor (0 to 1)
             float alpha = 1.0f;
@@ -379,14 +381,24 @@ int main(int argc, char** argv) {
                 alpha = static_cast<float>(stage2_ticks) / static_cast<float>(interpolation_ticks);
             }
             
+            // Interpolate target positions (15 elements for ankle solver compatibility)
+            float target_pos[15];
+            for (int i = 0; i < 15; ++i) {
+                if (i < 12) {
+                    target_pos[i] = initial_positions[i] * (1.0f - alpha) + DEFAULT_JOINT_ANGLES[i] * alpha;
+                } else {
+                    target_pos[i] = DEFAULT_JOINT_ANGLES[i];
+                }
+            }
+            
+            // Apply ankle solver transformation if enabled
+            applyAnkleSolver(target_pos, ankle_solver);
+            
             // Compute torques for each joint
             std::vector<float> torques(12, 0.0f);
             for (int i = 0; i < 12; ++i) {
-                // Interpolate target position
-                float target = initial_positions[i] * (1.0f - alpha) + DEFAULT_JOINT_ANGLES[i] * alpha;
-                
-                // PD control
-                float torque = pdControl(target, joint_pos[i], 0.0f, joint_vel[i], PD_KP[i], PD_KD[i]);
+                // PD control using transformed target position
+                float torque = pdControl(target_pos[i], joint_pos[i], 0.0f, joint_vel[i], PD_KP[i], PD_KD[i]);
                 
                 // Clip torque
                 if (torque > MAX_TORQUE_LIMIT[i]) torque = MAX_TORQUE_LIMIT[i];
@@ -405,6 +417,8 @@ int main(int argc, char** argv) {
             
             stage2_ticks++;
             usleep(1000);  // 1ms
+
+
         }
         
         std::cout << "Default position reached and stabilized!" << std::endl;
@@ -439,6 +453,7 @@ int main(int argc, char** argv) {
             std::cerr << "Failed to fetch observations" << std::endl;
             break;
         }
+
         
         // Check if it's time to update policy (50 Hz)
         auto now = std::chrono::steady_clock::now();
@@ -532,7 +547,7 @@ int main(int argc, char** argv) {
             }
             
             // Send torques to robot
-            robot->writeTorque(torques);
+            // robot->writeTorque(torques);
         }
         
         // Update counter for PD control recalculation (every 5ms)

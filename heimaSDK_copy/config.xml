@@ -110,6 +110,25 @@
             <Slave master="0" domain="12" alias="13" type="MT_Device">1</Slave>
             <Slave master="0" domain="13" alias="14" type="MT_Device">1</Slave>
             <Slave master="0" domain="14" alias="15" type="MT_Device">1</Slave>
+
+            <!-- <Slave master="0" domain="0" alias="1" type="MT_Device">1</Slave>
+            <Slave master="0" domain="1" alias="2" type="MT_Device">1</Slave>
+            <Slave master="0" domain="2" alias="3" type="MT_Device">1</Slave>
+            <Slave master="0" domain="3" alias="4" type="MT_Device">1</Slave>
+            <Slave master="0" domain="4" alias="5" type="MT_Device">1</Slave>
+            <Slave master="0" domain="5" alias="6" type="MT_Device">1</Slave>
+            <Slave master="0" domain="6" alias="7" type="MT_Device">1</Slave>
+            <Slave master="0" domain="7" alias="8" type="MT_Device">1</Slave>
+            <Slave master="0" domain="8" alias="9" type="MT_Device">1</Slave>
+            <Slave master="0" domain="9" alias="10" type="MT_Device">1</Slave>
+            <Slave master="0" domain="10" alias="11" type="MT_Device">1</Slave>
+            <Slave master="0" domain="11" alias="12" type="MT_Device">1</Slave>
+            <Slave master="0" domain="12" alias="13" type="MT_Device">1</Slave>
+            <Slave master="0" domain="13" alias="14" type="MT_Device">1</Slave>
+            <Slave master="0" domain="14" alias="15" type="MT_Device">1</Slave> -->
+
+
+
             <!-- <Slave master="0" domain="15" alias="16" type="MT_Device">1</Slave>
             <Slave master="0" domain="16" alias="17" type="MT_Device">1</Slave>
             <Slave master="0" domain="17" alias="18" type="MT_Device">1</Slave>
@@ -130,7 +149,7 @@
     </ECAT>
 
     <Motors>
-        <!-- left leg -->
+        <!-- right leg -->
         <!-- x12 motor -->
         <Motor limb="0" motor="0" alias="1">
             <Polarity>-1</Polarity>
@@ -161,7 +180,7 @@
         </Motor>
         <!-- x15 motor -->
         <Motor limb="0" motor="2" alias="3">
-            <Polarity>-1</Polarity>
+            <Polarity>1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>36</GearRatioTor>
@@ -175,7 +194,7 @@
         </Motor>
         <!-- x12 motor -->
         <Motor limb="0" motor="3" alias="4"> 
-            <Polarity>-1</Polarity>
+            <Polarity>1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>20</GearRatioTor>
@@ -189,7 +208,7 @@
         </Motor>
         <!-- x6 motor -->
         <Motor limb="0" motor="4" alias="5">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
@@ -218,7 +237,7 @@
 
 
 
-        <!-- right leg -->
+        <!-- left leg -->
         <!-- x12 motor -->
         <Motor limb="1" motor="0" alias="7">
             <Polarity>-1</Polarity>
@@ -263,7 +282,7 @@
         </Motor>
         <!-- x12 motor -->
         <Motor limb="1" motor="3" alias="10"> 
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>20</GearRatioTor>
@@ -277,7 +296,7 @@
         </Motor>
         <!-- x6 motor -->
         <Motor limb="1" motor="4" alias="11">
-            <Polarity>-1</Polarity>
+            <Polarity>1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
@@ -291,7 +310,7 @@
         </Motor>
         <!-- x6 motor -->
         <Motor limb="1" motor="5" alias="12">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>

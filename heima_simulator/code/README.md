@@ -51,6 +51,7 @@ sudo apt-get install libethercat-dev
 
 ```bash
 ./heima_sim_deploy [mode] [onnx_file] [config] [vx] [vy] [wz]
+./heima_sim_deploy real  /home/thor-pc/repo/HeimaFrameWork/heima_simulator/code/checkpoints/policy_1_0127.onnx /home/thor-pc/repo/HeimaFrameWork/heimaSDK_copy/config.xml 0.0 0.0 0.0
 ```
 
 **Arguments**:

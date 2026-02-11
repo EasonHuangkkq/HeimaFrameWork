@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(HeimaSimDeploy VERSION 1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Build option: simulator or real robot mode
@@ -52,44 +52,52 @@ endif()
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 
-# Find gRPC and Protobuf
-find_package(PkgConfig)
-if(PkgConfig_FOUND)
-    pkg_check_modules(GRPC grpc++)
-    pkg_check_modules(PROTOBUF protobuf)
-endif()
+# Find gRPC and Protobuf (only needed for simulator mode)
+if(NOT BUILD_REAL_ROBOT)
+    message(STATUS "=== Simulator mode: Finding gRPC and Protobuf ===")
+    
+    find_package(PkgConfig)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(GRPC grpc++)
+        pkg_check_modules(PROTOBUF protobuf)
+    endif()
 
-# Find protobuf library (required)
-find_library(PROTOBUF_LIB protobuf
-    PATHS /usr/local/lib /usr/lib
-)
-if(NOT PROTOBUF_LIB)
-    message(FATAL_ERROR "Protobuf library not found. Please install libprotobuf-dev")
-endif()
+    # Find protobuf library (required for simulator)
+    find_library(PROTOBUF_LIB protobuf
+        PATHS /usr/local/lib /usr/lib
+    )
+    if(NOT PROTOBUF_LIB)
+        message(FATAL_ERROR "Protobuf library not found. Please install libprotobuf-dev")
+    endif()
 
-# Find gRPC library
-find_library(GRPC_CPP_LIB grpc++
-    PATHS /usr/local/lib /usr/lib
-)
-if(NOT GRPC_CPP_LIB)
-    message(FATAL_ERROR "gRPC++ library not found. Please install libgrpc++-dev")
-endif()
+    # Find gRPC library (required for simulator)
+    find_library(GRPC_CPP_LIB grpc++
+        PATHS /usr/local/lib /usr/lib
+    )
+    if(NOT GRPC_CPP_LIB)
+        message(FATAL_ERROR "gRPC++ library not found. Please install libgrpc++-dev")
+    endif()
 
-# Set library variables
-if(GRPC_FOUND)
-    set(GRPC_LIBRARIES ${GRPC_LIBRARIES})
+    # Set library variables
+    if(GRPC_FOUND)
+        set(GRPC_LIBRARIES ${GRPC_LIBRARIES})
+    else()
+        set(GRPC_LIBRARIES ${GRPC_CPP_LIB})
+    endif()
+
+    if(PROTOBUF_FOUND)
+        set(PROTOBUF_LIBRARIES ${PROTOBUF_LIBRARIES})
+    else()
+        set(PROTOBUF_LIBRARIES ${PROTOBUF_LIB})
+    endif()
+
+    message(STATUS "gRPC libraries: ${GRPC_LIBRARIES}")
+    message(STATUS "Protobuf libraries: ${PROTOBUF_LIBRARIES}")
 else()
-    set(GRPC_LIBRARIES ${GRPC_CPP_LIB})
+    message(STATUS "=== Real robot mode: gRPC not required ===")
+    set(GRPC_LIBRARIES "")
+    set(PROTOBUF_LIBRARIES "")
 endif()
-
-if(PROTOBUF_FOUND)
-    set(PROTOBUF_LIBRARIES ${PROTOBUF_LIBRARIES})
-else()
-    set(PROTOBUF_LIBRARIES ${PROTOBUF_LIB})
-endif()
-
-message(STATUS "gRPC libraries: ${GRPC_LIBRARIES}")
-message(STATUS "Protobuf libraries: ${PROTOBUF_LIBRARIES}")
 
 # ONNX Runtime library path - detect architecture
 if(${CMAKE_CXX_COMPILER} MATCHES "aarch64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
@@ -177,23 +185,28 @@ endif()
 # Build robot interface library
 set(ROBOT_INTERFACE_SOURCES
     robot_interface.cpp
-    robot_interface_sim.cpp
 )
 
-# Add real robot interface only if requested
+# Add simulator or real robot interface based on mode
 if(BUILD_REAL_ROBOT)
     list(APPEND ROBOT_INTERFACE_SOURCES robot_interface_real.cpp)
     message(STATUS "Including robot_interface_real.cpp")
+else()
+    list(APPEND ROBOT_INTERFACE_SOURCES robot_interface_sim.cpp)
+    message(STATUS "Including robot_interface_sim.cpp")
 endif()
 
 add_library(robot_interface STATIC
     ${ROBOT_INTERFACE_SOURCES}
 )
 
-target_link_libraries(robot_interface PUBLIC
-    ${GRPC_LIBRARIES}
-    ${PROTOBUF_LIBRARIES}
-)
+# Only link gRPC/protobuf in simulator mode
+if(NOT BUILD_REAL_ROBOT)
+    target_link_libraries(robot_interface PUBLIC
+        ${GRPC_LIBRARIES}
+        ${PROTOBUF_LIBRARIES}
+    )
+endif()
 
 if(BUILD_REAL_ROBOT)
     target_link_libraries(robot_interface PUBLIC driver_sdk)
@@ -204,27 +217,41 @@ target_include_directories(robot_interface PUBLIC
 )
 
 # Build main executable (unified: simulator & real robot)
+set(MAIN_SOURCES main.cpp)
+
+# Only compile gRPC proto files in simulator mode
+if(NOT BUILD_REAL_ROBOT)
+    list(APPEND MAIN_SOURCES 
+        ./proto/mujoco_service.pb.cc
+        ./proto/mujoco_service.grpc.pb.cc
+    )
+endif()
+
 add_executable(heima_sim_deploy
-    main.cpp
-    ./proto/mujoco_service.pb.cc
-    ./proto/mujoco_service.grpc.pb.cc
+    ${MAIN_SOURCES}
 )
 
-# Link libraries - ensure protobuf is included
+# Link libraries
 target_link_libraries(heima_sim_deploy PUBLIC
     robot_interface
     onnx_wrapper
     ankle_solver
     onnxruntime
-    ${GRPC_LIBRARIES}
-    ${PROTOBUF_LIBRARIES}
     Threads::Threads
     m
 )
 
-# Add protobuf include directories if found
-if(PROTOBUF_FOUND)
-    target_include_directories(heima_sim_deploy PUBLIC ${PROTOBUF_INCLUDE_DIRS})
+# Only link gRPC/protobuf in simulator mode
+if(NOT BUILD_REAL_ROBOT)
+    target_link_libraries(heima_sim_deploy PUBLIC
+        ${GRPC_LIBRARIES}
+        ${PROTOBUF_LIBRARIES}
+    )
+    
+    # Add protobuf include directories if found
+    if(PROTOBUF_FOUND)
+        target_include_directories(heima_sim_deploy PUBLIC ${PROTOBUF_INCLUDE_DIRS})
+    endif()
 endif()
 
 # Set RPATH for runtime library loading

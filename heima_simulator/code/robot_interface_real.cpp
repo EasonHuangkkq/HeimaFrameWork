@@ -42,7 +42,8 @@ bool RealRobotInterface::init() {
     int wait_ticks = 0;
     bool all_operational = false;
     
-    while (!all_operational && wait_ticks < max_wait_ticks) {
+    // while (!all_operational && wait_ticks < max_wait_ticks) {
+    while (!all_operational) {
         sdk_->getMotorActual(motor_states_);
         
         all_operational = true;
