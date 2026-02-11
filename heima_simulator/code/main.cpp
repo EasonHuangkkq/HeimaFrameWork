@@ -81,8 +81,8 @@ const float CMD_SCALE[3] = {2.0f, 2.0f, 0.25f};
 
 // TESTING
 const float DEFAULT_JOINT_ANGLES[15] = {
-    0.0f, 0.0f, 0.0f, 0.0f, 0.3f, -0.3f,  // Right leg
-    0.0f, 0.0f, 0.0f, 0.0f, 0.3f, 0.3f,   // Left leg
+    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,  // Right leg
+    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f   // Left leg
     0.0f, 0.0f, 0.0f
 };
 
