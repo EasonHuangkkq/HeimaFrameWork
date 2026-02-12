@@ -318,6 +318,7 @@ int main(int argc, char** argv) {
     std::vector<float> observation(45);
     std::vector<float> actions(12, 0.0f);
     std::vector<float> previous_actions(12, 0.0f);
+    std::vector<float> current_torques(12, 0.0f);  // Store current torque commands for logging
     
     float commands[3] = {cmd_vx, cmd_vy, cmd_wz};
 
@@ -339,6 +340,9 @@ int main(int argc, char** argv) {
         csv_file << "cmd_vx,cmd_vy,cmd_wz,";
         for (int i = 0; i < 12; ++i) {
             csv_file << "action_" << i << ",";
+        }
+        for (int i = 0; i < 12; ++i) {
+            csv_file << "torque_" << i << ",";
         }
         for (int i = 0; i < 45; ++i) {
             csv_file << "obs_" << i;
@@ -405,6 +409,11 @@ int main(int argc, char** argv) {
                 if (torque < -MAX_TORQUE_LIMIT[i]) torque = -MAX_TORQUE_LIMIT[i];
                 
                 torques[i] = torque;
+            }
+            
+            // Store torques for logging
+            for (int i = 0; i < 12; ++i) {
+                current_torques[i] = torques[i];
             }
             
             // Send torques
@@ -486,6 +495,9 @@ int main(int argc, char** argv) {
                 for (int i = 0; i < 12; ++i) {
                     csv_file << previous_actions[i] << ",";
                 }
+                for (int i = 0; i < 12; ++i) {
+                    csv_file << current_torques[i] << ",";
+                }
                 for (int i = 0; i < 45; ++i) {
                     csv_file << observation[i];
                     if (i < 44) csv_file << ",";
@@ -545,6 +557,9 @@ int main(int argc, char** argv) {
                 
                 torques[i] = torqueCmd;
             }
+            
+            // Store torques for logging
+            current_torques = torques;
             
             // Send torques to robot
             robot->writeTorque(torques);
