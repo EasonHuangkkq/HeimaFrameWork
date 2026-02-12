@@ -26,7 +26,7 @@ void handleSignal(int) {
 }
 
 // Ankle solver configuration
-const bool USE_ANKLE_SOLVER = true;  // Set to true to enable ankle kinematics correction
+const bool USE_ANKLE_SOLVER = false;  // Set to true to enable ankle kinematics correction
 
 // Apply ankle solver to transform desired ankle pitch/roll into actual motor angles
 void applyAnkleSolver(float target_pos[15], AnkleSolver& ankle_solver) {
@@ -82,7 +82,7 @@ const float CMD_SCALE[3] = {2.0f, 2.0f, 0.25f};
 // TESTING
 const float DEFAULT_JOINT_ANGLES[15] = {
     0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,  // Right leg
-    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f   // Left leg
+    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,   // Left leg
     0.0f, 0.0f, 0.0f
 };
 
@@ -120,11 +120,11 @@ const float PD_KD[15] = {
     1.0f, 1.0f, 1.0f
 };
 
-// Maximum torque limits for each motor (N·m)
+// Maximum torque limits for each motor (N·m) - aligned with heima_noarm_config.py
 const float MAX_TORQUE_LIMIT[15] = {
-    30.0f, 20.0f, 30.0f, 30.0f, 30.0f, 30.0f,  // Left leg
-    30.0f, 20.0f, 30.0f, 30.0f, 30.0f, 30.0f,   // Right leg
-    50.0f, 50.0f, 50.0f
+    40.0f, 40.0f, 40.0f, 80.0f, 40.0f, 40.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    40.0f, 40.0f, 40.0f, 80.0f, 40.0f, 40.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    80.0f, 80.0f, 80.0f  // Waist motors (if present)
 };
 // const float MAX_TORQUE_LIMIT[15] = {
 //     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
@@ -547,7 +547,7 @@ int main(int argc, char** argv) {
             }
             
             // Send torques to robot
-            // robot->writeTorque(torques);
+            robot->writeTorque(torques);
         }
         
         // Update counter for PD control recalculation (every 5ms)
