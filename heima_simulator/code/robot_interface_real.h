@@ -35,6 +35,8 @@ private:
     std::vector<DriverSDK::motorActualStruct> motor_states_;
     std::vector<DriverSDK::motorTargetStruct> motor_commands_;
     DriverSDK::imuStruct imu_data_;
+    float initial_yaw_ = 0.0f;
+    bool initial_yaw_set_ = false;
 };
 
 #endif // ROBOT_INTERFACE_REAL_H

@@ -39,6 +39,18 @@ bool SimulatorInterface::fetchObs(
         base_ang_vel.assign(response.base_ang_vel().begin(), response.base_ang_vel().end());
         joint_pos.assign(response.joint_pos().begin(), response.joint_pos().end());
         joint_vel.assign(response.joint_vel().begin(), response.joint_vel().end());
+        
+        // Set initial yaw offset on first reading
+        if (!initial_yaw_set_) {
+            initial_yaw_ = rpy[2];
+            initial_yaw_set_ = true;
+            std::cout << "Initial yaw set to: " << initial_yaw_ << " rad (" 
+                      << (initial_yaw_ * 180.0f / 3.14159265359f) << " deg)" << std::endl;
+        }
+        
+        // Adjust yaw relative to initial
+        rpy[2] -= initial_yaw_;
+        
         return true;
     } else {
         std::cerr << "FetchObs failed: " << status.error_message() << std::endl;

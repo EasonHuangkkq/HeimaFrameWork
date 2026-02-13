@@ -87,31 +87,50 @@ bool RealRobotInterface::fetchObs(
     rpy[1] = imu_data_.rpy[1];  // Pitch
     rpy[2] = imu_data_.rpy[2];  // Yaw
     
+    // Set initial yaw offset on first reading
+    if (!initial_yaw_set_) {
+        initial_yaw_ = rpy[2];
+        initial_yaw_set_ = true;
+        std::cout << "Initial yaw set to: " << initial_yaw_ << " rad (" 
+                  << (initial_yaw_ * 180.0f / 3.14159265359f) << " deg)" << std::endl;
+    }
+    
+    // Adjust yaw relative to initial
+    rpy[2] -= initial_yaw_;
+    
     // Fill base angular velocity
     base_ang_vel.resize(3);
     base_ang_vel[0] = imu_data_.gyr[0];
     base_ang_vel[1] = imu_data_.gyr[1];
     base_ang_vel[2] = imu_data_.gyr[2];
     
-    // Fill joint positions and velocities (first 12 motors = legs)
-    joint_pos.resize(12);
-    joint_vel.resize(12);
-    for (int i = 0; i < 12; ++i) {
+    // Fill joint positions and velocities (12 legs + 3 waist = 15 motors)
+    int num_joints = std::min(15, motor_count_);
+    joint_pos.resize(num_joints);
+    joint_vel.resize(num_joints);
+    for (int i = 0; i < num_joints; ++i) {
         joint_pos[i] = motor_states_[i].pos;
         joint_vel[i] = motor_states_[i].vel;
+    }
+    
+    // If we have fewer than 15 motors, pad with zeros for waist motors
+    if (num_joints < 15) {
+        joint_pos.resize(15, 0.0f);
+        joint_vel.resize(15, 0.0f);
     }
     
     return true;
 }
 
 bool RealRobotInterface::writeTorque(const std::vector<float>& torques) {
-    if (torques.size() != 12) {
-        std::cerr << "Error: Expected 12 torques, got " << torques.size() << std::endl;
+    if (torques.size() < 12) {
+        std::cerr << "Error: Expected at least 12 torques, got " << torques.size() << std::endl;
         return false;
     }
     
-    // Set torque commands for first 12 motors (legs)
-    for (int i = 0; i < 12; ++i) {
+    // Set torque commands for motors (legs + waist)
+    int num_motors = std::min(static_cast<int>(torques.size()), motor_count_);
+    for (int i = 0; i < num_motors; ++i) {
         motor_commands_[i].tor = torques[i];
         motor_commands_[i].pos = 0.0f;  // Not used in torque mode
         motor_commands_[i].vel = 0.0f;  // Not used in torque mode

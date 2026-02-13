@@ -106,7 +106,7 @@ const float ACTION_SCALE = 0.25f;
 const float PD_KP[15] = {
     150.0f, 150.0f, 150.0f, 200.0f, 60.0f, 60.0f,  // Left leg
     150.0f, 150.0f, 150.0f, 200.0f, 60.0f, 60.0f,   // Right leg
-    200.0f, 200.0f, 200.0f
+    300.0f, 300.0f, 300.0f
 };
 // const float PD_KP[15] = {
 //     30.0f, 30.0f, 30.0f, 40.0f, 20.0f, 20.0f,  // Left leg
@@ -117,14 +117,14 @@ const float PD_KP[15] = {
 const float PD_KD[15] = {
     1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,  // Left leg
     1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,   // Right leg
-    1.0f, 1.0f, 1.0f
+    4.0f, 4.0f, 4.0f
 };
 
 // Maximum torque limits for each motor (N·m) - aligned with heima_noarm_config.py
 const float MAX_TORQUE_LIMIT[15] = {
     40.0f, 40.0f, 40.0f, 80.0f, 40.0f, 40.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
     40.0f, 40.0f, 40.0f, 80.0f, 40.0f, 40.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    80.0f, 80.0f, 80.0f  // Waist motors (if present)
+    200.0f, 200.0f, 200.0f  // Waist motors (if present)
 };
 // const float MAX_TORQUE_LIMIT[15] = {
 //     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
@@ -312,8 +312,8 @@ int main(int argc, char** argv) {
     // Prepare data structures
     std::vector<float> rpy(3, 0.0f);
     std::vector<float> base_ang_vel(3, 0.0f);
-    std::vector<float> joint_pos(12, 0.0f);
-    std::vector<float> joint_vel(12, 0.0f);
+    std::vector<float> joint_pos(15, 0.0f);  // 12 legs + 3 waist
+    std::vector<float> joint_vel(15, 0.0f);  // 12 legs + 3 waist
     
     std::vector<float> observation(45);
     std::vector<float> actions(12, 0.0f);
@@ -372,6 +372,7 @@ int main(int argc, char** argv) {
         int stage2_ticks = 0;
         
         while (!g_stop && stage2_ticks < (interpolation_ticks + hold_ticks)) {
+        // while (!g_stop) {
             // Fetch current state
             if (!robot->fetchObs(rpy, base_ang_vel, joint_pos, joint_vel)) {
                 std::cerr << "Failed to fetch state during initialization" << std::endl;
@@ -398,8 +399,10 @@ int main(int argc, char** argv) {
             // Apply ankle solver transformation if enabled
             applyAnkleSolver(target_pos, ankle_solver);
             
-            // Compute torques for each joint
-            std::vector<float> torques(12, 0.0f);
+            // Compute torques for each joint (12 legs + 3 waist)
+            std::vector<float> torques(15, 0.0f);
+            
+            // Leg motors (0-11)
             for (int i = 0; i < 12; ++i) {
                 // PD control using transformed target position
                 float torque = pdControl(target_pos[i], joint_pos[i], 0.0f, joint_vel[i], PD_KP[i], PD_KD[i]);
@@ -411,12 +414,26 @@ int main(int argc, char** argv) {
                 torques[i] = torque;
             }
             
-            // Store torques for logging
+            // Waist motors (12-14) - keep at default position
+            for (int i = 12; i < 15; ++i) {
+                float target = DEFAULT_JOINT_ANGLES[i];
+                float actual = joint_pos[i];  // Use actual waist motor position
+                float actual_vel = joint_vel[i];
+                float torque = pdControl(target, actual, 0.0f, actual_vel, PD_KP[i], PD_KD[i]);
+                
+                // Clip torque
+                if (torque > MAX_TORQUE_LIMIT[i]) torque = MAX_TORQUE_LIMIT[i];
+                if (torque < -MAX_TORQUE_LIMIT[i]) torque = -MAX_TORQUE_LIMIT[i];
+                
+                torques[i] = torque;
+            }
+            
+            // Store torques for logging (only first 12 for legs)
             for (int i = 0; i < 12; ++i) {
                 current_torques[i] = torques[i];
             }
             
-            // Send torques
+            // Send torques (including waist motors)
             robot->writeTorque(torques);
             
             if (stage2_ticks % 500 == 0) {
@@ -533,9 +550,10 @@ int main(int argc, char** argv) {
             // Apply ankle solver transformation if enabled
             applyAnkleSolver(target_pos, ankle_solver);
 
-            // Prepare torque commands for 12 leg joints
-            std::vector<float> torques(12, 0.0f);
+            // Prepare torque commands for 12 leg joints + 3 waist motors
+            std::vector<float> torques(15, 0.0f);
             
+            // Leg motors (0-11)
             for (int i = 0; i < 12; ++i) {
                 float actual_pos = joint_pos[i];
                 float target_vel = 0.0f;
@@ -558,10 +576,29 @@ int main(int argc, char** argv) {
                 torques[i] = torqueCmd;
             }
             
-            // Store torques for logging
-            current_torques = torques;
+            // Waist motors (12-14) - keep at default position
+            for (int i = 12; i < 15; ++i) {
+                float target = DEFAULT_JOINT_ANGLES[i];
+                float actual = joint_pos[i];  // Use actual waist motor position
+                float actual_vel = joint_vel[i];
+                float torqueCmd = pdControl(target, actual, 0.0f, actual_vel, PD_KP[i], PD_KD[i]);
+                
+                // Clip torque
+                if (torqueCmd > MAX_TORQUE_LIMIT[i]) {
+                    torqueCmd = MAX_TORQUE_LIMIT[i];
+                } else if (torqueCmd < -MAX_TORQUE_LIMIT[i]) {
+                    torqueCmd = -MAX_TORQUE_LIMIT[i];
+                }
+                
+                torques[i] = torqueCmd;
+            }
             
-            // Send torques to robot
+            // Store torques for logging (only first 12 for legs)
+            for (int i = 0; i < 12; ++i) {
+                current_torques[i] = torques[i];
+            }
+            
+            // Send torques to robot (including waist motors)
             robot->writeTorque(torques);
         }
         

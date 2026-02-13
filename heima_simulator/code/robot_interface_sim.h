@@ -41,6 +41,8 @@ public:
 private:
     std::string grpc_server_;
     std::unique_ptr<MuJoCoService::Stub> stub_;
+    float initial_yaw_ = 0.0f;
+    bool initial_yaw_set_ = false;
 };
 
 #endif // ROBOT_INTERFACE_SIM_H
