@@ -81,13 +81,25 @@ const float CMD_SCALE[3] = {2.0f, 2.0f, 0.25f};
 
 // TESTING
 const float DEFAULT_JOINT_ANGLES[15] = {
-    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,  // Right leg
-    0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,   // Left leg
-    0.0f, 0.0f, 0.0f
+    0.0f, 0.0f, -0.25f, -0.5f, 0.25f, 0.0f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
+    0.0f, 0.0f, -0.25f, -0.5f, 0.25f, 0.0f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
+    0.0f, 0.0f, 0.0f  // Waist motors (not in training config)
 };
 
-// Action scale (from training config)
-const float ACTION_SCALE = 0.25f;
+// Action scales from env.yaml (per-joint scales)
+// Order matches DEFAULT_JOINT_ANGLES
+// Values from env.yaml actions.joint_pos.scale:
+//   J_hip_.*_roll: 1.9910780472403882
+//   J_hip_.*_yaw: 1.9910780472403882
+//   J_hip_.*_pitch: 1.1352349630969132
+//   J_knee_.*_pitch: 1.9910780472403882
+//   J_ankle_.*_pitch: 0.8940104439540857
+//   J_ankle_.*_roll: 0.8940104439540857
+const float ACTION_SCALE[15] = {
+    1.9910780472403882f, 1.9910780472403882f, 1.1352349630969132f, 1.9910780472403882f, 0.8940104439540857f, 0.8940104439540857f,  // Left leg
+    1.9910780472403882f, 1.9910780472403882f, 1.1352349630969132f, 1.9910780472403882f, 0.8940104439540857f, 0.8940104439540857f,  // Right leg
+    1.0f, 1.0f, 1.0f  // Waist motors (not in training config, use 1.0)
+};
 
 // PD gains (from training config)
 // const float PD_KP[12] = {
@@ -102,29 +114,31 @@ const float ACTION_SCALE = 0.25f;
 // };
 
 
-// TESTING
+// PD gains from env.yaml (stiffness=kp, damping=kd)
+// Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+// Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+// Values from env.yaml:
+//   hip_roll/yaw: kp=40.179, kd=2.558
+//   hip_pitch: kp=99.098, kd=6.309
+//   knee: kp=40.179, kd=2.558
+//   ankle_pitch/roll: kp=16.778, kd=1.068
 const float PD_KP[15] = {
-    150.0f, 150.0f, 150.0f, 200.0f, 60.0f, 60.0f,  // Left leg
-    150.0f, 150.0f, 150.0f, 200.0f, 60.0f, 60.0f,   // Right leg
-    300.0f, 300.0f, 300.0f
+    40.179f, 40.179f, 99.098f, 40.179f, 16.778f, 16.778f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
+    40.179f, 40.179f, 99.098f, 40.179f, 16.778f, 16.778f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
+    200.0f, 200.0f, 200.0f  // Waist motors (not in training config, keep default)
 };
-// const float PD_KP[15] = {
-//     30.0f, 30.0f, 30.0f, 40.0f, 20.0f, 20.0f,  // Left leg
-//     30.0f, 30.0f, 30.0f, 40.0f, 20.0f, 20.0f,   // Right leg
-//     8.0f, 8.0f, 8.0f
-// };
 
 const float PD_KD[15] = {
-    1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,  // Left leg
-    1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,   // Right leg
-    4.0f, 4.0f, 4.0f
+    2.558f, 2.558f, 6.309f, 2.558f, 1.068f, 1.068f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
+    2.558f, 2.558f, 6.309f, 2.558f, 1.068f, 1.068f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
+    1.0f, 1.0f, 1.0f  // Waist motors (not in training config, keep default)
 };
 
 // Maximum torque limits for each motor (N·m) - aligned with heima_noarm_config.py
 const float MAX_TORQUE_LIMIT[15] = {
-    40.0f, 40.0f, 40.0f, 80.0f, 40.0f, 40.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    40.0f, 40.0f, 40.0f, 80.0f, 40.0f, 40.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    200.0f, 200.0f, 200.0f  // Waist motors (if present)
+    50.0f, 50.0f, 50.0f, 100.0f, 50.0f, 50.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    50.0f, 50.0f, 50.0f, 100.0f, 50.0f, 50.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    100.0f, 100.0f, 100.0f  // Waist motors (if present)
 };
 // const float MAX_TORQUE_LIMIT[15] = {
 //     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
@@ -543,7 +557,7 @@ int main(int argc, char** argv) {
             for (int i = 0; i < 15; ++i) {
                 target_pos[i] = DEFAULT_JOINT_ANGLES[i];
                 if (i < 12) {
-                    target_pos[i] = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE;
+                    target_pos[i] = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE[i];
                 }
             }
 
