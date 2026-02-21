@@ -128,6 +128,12 @@ const float PD_KP[15] = {
     200.0f, 200.0f, 200.0f  // Waist motors (not in training config, keep default)
 };
 
+// const float PD_KP[15] = {
+//     140.179f, 140.179f, 199.098f, 140.179f, 66.778f, 66.778f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
+//     140.179f, 140.179f, 199.098f, 140.179f, 66.778f, 66.778f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
+//     200.0f, 200.0f, 200.0f  // Waist motors (not in training config, keep default)
+// };
+
 const float PD_KD[15] = {
     2.558f, 2.558f, 6.309f, 2.558f, 1.068f, 1.068f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
     2.558f, 2.558f, 6.309f, 2.558f, 1.068f, 1.068f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
@@ -136,9 +142,9 @@ const float PD_KD[15] = {
 
 // Maximum torque limits for each motor (N·m) - aligned with heima_noarm_config.py
 const float MAX_TORQUE_LIMIT[15] = {
-    50.0f, 50.0f, 50.0f, 100.0f, 50.0f, 50.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    50.0f, 50.0f, 50.0f, 100.0f, 50.0f, 50.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    100.0f, 100.0f, 100.0f  // Waist motors (if present)
+    120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    150.0f, 150.0f, 150.0f  // Waist motors (if present)
 };
 // const float MAX_TORQUE_LIMIT[15] = {
 //     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg

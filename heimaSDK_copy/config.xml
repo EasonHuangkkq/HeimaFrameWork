@@ -180,7 +180,7 @@
         </Motor>
         <!-- x15 motor -->
         <Motor limb="0" motor="2" alias="3">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>36</GearRatioTor>
@@ -208,7 +208,7 @@
         </Motor>
         <!-- x6 motor -->
         <Motor limb="0" motor="4" alias="5">
-            <Polarity>-1</Polarity>
+            <Polarity>1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
@@ -222,7 +222,7 @@
         </Motor>
         <!-- x6 motor -->
         <Motor limb="0" motor="5" alias="6">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
@@ -296,7 +296,7 @@
         </Motor>
         <!-- x6 motor -->
         <Motor limb="1" motor="4" alias="11">
-            <Polarity>1</Polarity>
+            <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
@@ -310,7 +310,7 @@
         </Motor>
         <!-- x6 motor -->
         <Motor limb="1" motor="5" alias="12">
-            <Polarity>-1</Polarity>
+            <Polarity>1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
             <GearRatioTor>19.612</GearRatioTor>
