@@ -1,0 +1,94 @@
+# Heima Robot Control Configuration
+# PD Controller Gains, Default Joint Angles, and Action Scales
+
+# PD Controller Gains (stiffness = kp, damping = kd)
+# Order: Left leg [hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll]
+#        Right leg [hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll]
+#        Waist [3 motors]
+pd_gains:
+  kp:  # Stiffness (N·m/rad)
+    - 118.435  # Left: hip_roll
+    - 118.435  # Left: hip_yaw
+    - 197.392  # Left: hip_pitch
+    - 118.435  # Left: knee
+    - 20.96    # Left: ankle_pitch
+    - 0.0      # Left: ankle_roll
+    - 118.435  # Right: hip_roll
+    - 118.435  # Right: hip_yaw
+    - 197.392  # Right: hip_pitch
+    - 118.435  # Right: knee
+    - 20.96    # Right: ankle_pitch
+    - 0.0      # Right: ankle_roll
+    - 200.0    # Waist motor 1
+    - 200.0    # Waist motor 2
+    - 200.0    # Waist motor 3
+  kd:  # Damping (N·m·s/rad)
+    - 7.54     # Left: hip_roll
+    - 7.54     # Left: hip_yaw
+    - 12.566   # Left: hip_pitch
+    - 7.54     # Left: knee
+    - 1.436    # Left: ankle_pitch
+    - 0.1      # Left: ankle_roll
+    - 7.54     # Right: hip_roll
+    - 7.54     # Right: hip_yaw
+    - 12.566   # Right: hip_pitch
+    - 7.54     # Right: knee
+    - 1.436    # Right: ankle_pitch
+    - 0.1      # Right: ankle_roll
+    - 1.0      # Waist motor 1
+    - 1.0      # Waist motor 2
+    - 1.0      # Waist motor 3
+
+# Default joint angles (radians) when action = 0.0
+# Order: Left leg [hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll]
+#        Right leg [hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll]
+#        Waist [3 motors]
+default_joint_angles:
+  - 0.0      # Left: hip_roll
+  - 0.0      # Left: hip_yaw
+  - 0.4      # Left: hip_pitch
+  - -0.8     # Left: knee
+  - 0.4      # Left: ankle_pitch
+  - 0.0      # Left: ankle_roll
+  - 0.0      # Right: hip_roll
+  - 0.0      # Right: hip_yaw
+  - 0.4      # Right: hip_pitch
+  - -0.8     # Right: knee
+  - 0.4      # Right: ankle_pitch
+  - 0.0      # Right: ankle_roll
+  - 0.0      # Waist motor 1
+  - 0.0      # Waist motor 2
+  - 0.0      # Waist motor 3
+
+# Action scales (per-joint scales for neural network actions)
+# Order: Same as default_joint_angles
+# Action is applied as: target_angle = default_angle + action * action_scale
+action_scale:
+  - 0.574  # Left: hip_roll
+  - 0.574  # Left: hip_yaw
+  - 0.484  # Left: hip_pitch
+  - 0.574  # Left: knee
+  - 0.5    # Left: ankle_pitch
+  - 0.5    # Left: ankle_roll
+  - 0.574  # Right: hip_roll
+  - 0.574  # Right: hip_yaw
+  - 0.484  # Right: hip_pitch
+  - 0.574  # Right: knee
+  - 0.5    # Right: ankle_pitch
+  - 0.5    # Right: ankle_roll
+  - 1.0    # Waist motor 1
+  - 1.0    # Waist motor 2
+  - 1.0    # Waist motor 3
+
+# Observation scaling factors (for neural network input normalization)
+# These scales are applied to observations before feeding to the neural network
+observation_scales:
+  lin_vel_scale: 1.0      # Linear velocity scale (m/s)
+  ang_vel_scale: 1.0     # Angular velocity scale (rad/s)
+  dof_pos_scale: 1.0      # Joint position scale (rad)
+  dof_vel_scale: 1.0     # Joint velocity scale (rad/s)
+  cmd_scale:              # Command scale [vx, vy, wz]
+    - 1.0                 # vx (forward/backward)
+    - 1.0                 # vy (left/right)
+    - 1.0                # wz (yaw rate)
+

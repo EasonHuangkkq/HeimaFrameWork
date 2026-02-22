@@ -52,6 +52,24 @@ endif()
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+# Find yaml-cpp library
+find_package(yaml-cpp QUIET)
+if(NOT yaml-cpp_FOUND)
+    message(STATUS "yaml-cpp package not found, trying to find library manually...")
+    find_library(YAML_CPP_LIB yaml-cpp
+        PATHS /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu
+    )
+    if(YAML_CPP_LIB)
+        message(STATUS "yaml-cpp library found: ${YAML_CPP_LIB}")
+        set(YAML_CPP_LIBRARIES ${YAML_CPP_LIB})
+    else()
+        message(FATAL_ERROR "yaml-cpp library not found. Please install libyaml-cpp-dev: sudo apt-get install libyaml-cpp-dev")
+    endif()
+else()
+    message(STATUS "yaml-cpp package found")
+    set(YAML_CPP_LIBRARIES yaml-cpp)
+endif()
+
 # Find gRPC and Protobuf (only needed for simulator mode)
 if(NOT BUILD_REAL_ROBOT)
     message(STATUS "=== Simulator mode: Finding gRPC and Protobuf ===")
@@ -238,6 +256,7 @@ target_link_libraries(heima_sim_deploy PUBLIC
     ankle_solver
     onnxruntime
     Threads::Threads
+    ${YAML_CPP_LIBRARIES}
     m
 )
 

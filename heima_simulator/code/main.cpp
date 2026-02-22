@@ -22,6 +22,8 @@
 #include <fcntl.h>
 #include <thread>
 #include <mutex>
+#include <yaml-cpp/yaml.h>
+#include <string>
 
 // Signal handling
 volatile sig_atomic_t g_stop = 0;
@@ -160,79 +162,162 @@ void applyAnkleSolverInverse(std::vector<float>& joint_pos, AnkleSolver& ankle_s
     joint_pos[11] = -left_ankle_angles.second;  // roll angle
 }
 
-// Observation scaling factors (from training config)
-const float LIN_VEL_SCALE = 2.0f;
-const float ANG_VEL_SCALE = 0.25f;
-const float DOF_POS_SCALE = 1.0f;
-const float DOF_VEL_SCALE = 0.05f;
-const float CMD_SCALE[3] = {2.0f, 2.0f, 0.25f};
+// Observation scaling factors (from training config, loaded from YAML)
+float LIN_VEL_SCALE = 2.0f;
+float ANG_VEL_SCALE = 0.25f;
+float DOF_POS_SCALE = 1.0f;
+float DOF_VEL_SCALE = 0.05f;
+float CMD_SCALE[3] = {2.0f, 2.0f, 0.25f};
 
-// Default joint angles (from training config)
-// const float DEFAULT_JOINT_ANGLES[12] = {
-//     0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f,  // Right leg
-//     0.0f, 0.0f, 0.2f, -0.43f, 0.22f, 0.0f   // Left leg
-// };
-
-// TESTING
-const float DEFAULT_JOINT_ANGLES[15] = {
+// Default joint angles, action scales, and PD gains (loaded from config file)
+// Order: Left leg [hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll]
+//        Right leg [hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll]
+//        Waist [3 motors]
+float DEFAULT_JOINT_ANGLES[15] = {
     0.0f, 0.0f, -0.25f, -0.5f, 0.25f, 0.0f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
     0.0f, 0.0f, -0.25f, -0.5f, 0.25f, 0.0f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
-    0.0f, 0.0f, 0.0f  // Waist motors (not in training config)
+    0.0f, 0.0f, 0.0f  // Waist motors (default values, will be loaded from config)
 };
 
-// Action scales from env.yaml (per-joint scales)
-// Order matches DEFAULT_JOINT_ANGLES
-// Values from env.yaml actions.joint_pos.scale:
-//   J_hip_.*_roll: 1.9910780472403882
-//   J_hip_.*_yaw: 1.9910780472403882
-//   J_hip_.*_pitch: 1.1352349630969132
-//   J_knee_.*_pitch: 1.9910780472403882
-//   J_ankle_.*_pitch: 0.8940104439540857
-//   J_ankle_.*_roll: 0.8940104439540857
-const float ACTION_SCALE[15] = {
+float ACTION_SCALE[15] = {
     1.9910780472403882f, 1.9910780472403882f, 1.1352349630969132f, 1.9910780472403882f, 0.8940104439540857f, 0.8940104439540857f,  // Left leg
     1.9910780472403882f, 1.9910780472403882f, 1.1352349630969132f, 1.9910780472403882f, 0.8940104439540857f, 0.8940104439540857f,  // Right leg
-    1.0f, 1.0f, 1.0f  // Waist motors (not in training config, use 1.0)
+    1.0f, 1.0f, 1.0f  // Waist motors (default values, will be loaded from config)
 };
 
-// PD gains (from training config)
-// const float PD_KP[12] = {
-//     300.0f, 300.0f, 300.0f, 400.0f, 120.0f, 120.0f,  // Right leg
-//     300.0f, 300.0f, 300.0f, 400.0f, 120.0f, 120.0f   // Left leg
-// };
-
-// const float PD_KD[12] = {
-//     1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,  // Right leg
-//     1.0f, 1.0f, 1.0f, 4.0f, 1.0f, 1.0f,   // Left leg
-//     1.0f, 1.0f, 1.0f
-// };
-
-
-// PD gains from env.yaml (stiffness=kp, damping=kd)
-// Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-// Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-// Values from env.yaml:
-//   hip_roll/yaw: kp=40.179, kd=2.558
-//   hip_pitch: kp=99.098, kd=6.309
-//   knee: kp=40.179, kd=2.558
-//   ankle_pitch/roll: kp=16.778, kd=1.068
-const float PD_KP[15] = {
+float PD_KP[15] = {
     40.179f, 40.179f, 99.098f, 40.179f, 16.778f, 16.778f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
     40.179f, 40.179f, 99.098f, 40.179f, 16.778f, 16.778f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
-    200.0f, 200.0f, 200.0f  // Waist motors (not in training config, keep default)
+    200.0f, 200.0f, 200.0f  // Waist motors (default values, will be loaded from config)
 };
 
-// const float PD_KP[15] = {
-//     140.179f, 140.179f, 199.098f, 140.179f, 66.778f, 66.778f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
-//     140.179f, 140.179f, 199.098f, 140.179f, 66.778f, 66.778f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
-//     200.0f, 200.0f, 200.0f  // Waist motors (not in training config, keep default)
-// };
-
-const float PD_KD[15] = {
+float PD_KD[15] = {
     2.558f, 2.558f, 6.309f, 2.558f, 1.068f, 1.068f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
     2.558f, 2.558f, 6.309f, 2.558f, 1.068f, 1.068f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
-    1.0f, 1.0f, 1.0f  // Waist motors (not in training config, keep default)
+    1.0f, 1.0f, 1.0f  // Waist motors (default values, will be loaded from config)
 };
+
+// Load configuration from YAML file
+bool loadConfigFromYAML(const std::string& config_path) {
+    // Check if file exists
+    std::ifstream file(config_path);
+    if (!file.good()) {
+        std::cerr << "[Config] Warning: Config file not found: " << config_path << std::endl;
+        std::cerr << "[Config] Using default hardcoded values." << std::endl;
+        return false;
+    }
+    file.close();
+    
+    try {
+        YAML::Node config = YAML::LoadFile(config_path);
+        
+        // Load PD gains
+        if (config["pd_gains"]) {
+            if (config["pd_gains"]["kp"]) {
+                auto kp_node = config["pd_gains"]["kp"];
+                if (kp_node.size() == 15) {
+                    for (size_t i = 0; i < 15; ++i) {
+                        PD_KP[i] = kp_node[i].as<float>();
+                    }
+                    std::cout << "[Config] Loaded PD_KP from " << config_path << std::endl;
+                } else {
+                    std::cerr << "[Config] Warning: pd_gains.kp has " << kp_node.size() 
+                              << " elements, expected 15. Using default values." << std::endl;
+                }
+            }
+            
+            if (config["pd_gains"]["kd"]) {
+                auto kd_node = config["pd_gains"]["kd"];
+                if (kd_node.size() == 15) {
+                    for (size_t i = 0; i < 15; ++i) {
+                        PD_KD[i] = kd_node[i].as<float>();
+                    }
+                    std::cout << "[Config] Loaded PD_KD from " << config_path << std::endl;
+                } else {
+                    std::cerr << "[Config] Warning: pd_gains.kd has " << kd_node.size() 
+                              << " elements, expected 15. Using default values." << std::endl;
+                }
+            }
+        }
+        
+        // Load default joint angles
+        if (config["default_joint_angles"]) {
+            auto angles_node = config["default_joint_angles"];
+            if (angles_node.size() == 15) {
+                for (size_t i = 0; i < 15; ++i) {
+                    DEFAULT_JOINT_ANGLES[i] = angles_node[i].as<float>();
+                }
+                std::cout << "[Config] Loaded DEFAULT_JOINT_ANGLES from " << config_path << std::endl;
+            } else {
+                std::cerr << "[Config] Warning: default_joint_angles has " << angles_node.size() 
+                          << " elements, expected 15. Using default values." << std::endl;
+            }
+        }
+        
+        // Load action scales
+        if (config["action_scale"]) {
+            auto scale_node = config["action_scale"];
+            if (scale_node.size() == 15) {
+                for (size_t i = 0; i < 15; ++i) {
+                    ACTION_SCALE[i] = scale_node[i].as<float>();
+                }
+                std::cout << "[Config] Loaded ACTION_SCALE from " << config_path << std::endl;
+            } else {
+                std::cerr << "[Config] Warning: action_scale has " << scale_node.size() 
+                          << " elements, expected 15. Using default values." << std::endl;
+            }
+        }
+        
+        // Load observation scales
+        if (config["observation_scales"]) {
+            auto obs_scales = config["observation_scales"];
+            
+            if (obs_scales["lin_vel_scale"]) {
+                LIN_VEL_SCALE = obs_scales["lin_vel_scale"].as<float>();
+                std::cout << "[Config] Loaded LIN_VEL_SCALE = " << LIN_VEL_SCALE << std::endl;
+            }
+            
+            if (obs_scales["ang_vel_scale"]) {
+                ANG_VEL_SCALE = obs_scales["ang_vel_scale"].as<float>();
+                std::cout << "[Config] Loaded ANG_VEL_SCALE = " << ANG_VEL_SCALE << std::endl;
+            }
+            
+            if (obs_scales["dof_pos_scale"]) {
+                DOF_POS_SCALE = obs_scales["dof_pos_scale"].as<float>();
+                std::cout << "[Config] Loaded DOF_POS_SCALE = " << DOF_POS_SCALE << std::endl;
+            }
+            
+            if (obs_scales["dof_vel_scale"]) {
+                DOF_VEL_SCALE = obs_scales["dof_vel_scale"].as<float>();
+                std::cout << "[Config] Loaded DOF_VEL_SCALE = " << DOF_VEL_SCALE << std::endl;
+            }
+            
+            if (obs_scales["cmd_scale"]) {
+                auto cmd_scale_node = obs_scales["cmd_scale"];
+                if (cmd_scale_node.size() >= 3) {
+                    CMD_SCALE[0] = cmd_scale_node[0].as<float>();
+                    CMD_SCALE[1] = cmd_scale_node[1].as<float>();
+                    CMD_SCALE[2] = cmd_scale_node[2].as<float>();
+                    std::cout << "[Config] Loaded CMD_SCALE = [" 
+                              << CMD_SCALE[0] << ", " << CMD_SCALE[1] << ", " << CMD_SCALE[2] << "]" << std::endl;
+                } else {
+                    std::cerr << "[Config] Warning: cmd_scale has " << cmd_scale_node.size() 
+                              << " elements, expected 3. Using default values." << std::endl;
+                }
+            }
+        }
+        
+        return true;
+    } catch (const YAML::Exception& e) {
+        std::cerr << "[Config] Error loading YAML file " << config_path << ": " << e.what() << std::endl;
+        std::cerr << "[Config] Using default hardcoded values." << std::endl;
+        return false;
+    } catch (const std::exception& e) {
+        std::cerr << "[Config] Error: " << e.what() << std::endl;
+        std::cerr << "[Config] Using default hardcoded values." << std::endl;
+        return false;
+    }
+}
 
 // Maximum torque limits for each motor (N·m) - aligned with heima_noarm_config.py
 // const float MAX_TORQUE_LIMIT[15] = {
@@ -340,14 +425,16 @@ int main(int argc, char** argv) {
     std::string mode = "sim";  // "sim" or "real"
     std::string onnx_file = "policy_heima_noarm.onnx";
     std::string config = "";  // gRPC server for sim, config.xml for real
+    std::string config_yaml = "checkpoints/v1/config.yaml";  // YAML config file path
     float cmd_vx_arg = 0.0f;
     float cmd_vy_arg = 0.0f;
     float cmd_wz_arg = 0.0f;
     
     // Parse command line arguments
-    // Usage: ./main [mode] [onnx_file] [config] [vx] [vy] [wz]
+    // Usage: ./main [mode] [onnx_file] [config] [config_yaml] [vx] [vy] [wz]
     //   mode: "sim" (default) or "real"
     //   config: for sim = "localhost:50051" (default), for real = "config.xml" (default)
+    //   config_yaml: path to YAML config file (default: "checkpoints/v1/config.yaml")
     if (argc > 1) {
         mode = argv[1];
     }
@@ -358,13 +445,16 @@ int main(int argc, char** argv) {
         config = argv[3];
     }
     if (argc > 4) {
-        cmd_vx_arg = std::stof(argv[4]);
+        config_yaml = argv[4];
     }
     if (argc > 5) {
-        cmd_vy_arg = std::stof(argv[5]);
+        cmd_vx_arg = std::stof(argv[5]);
     }
     if (argc > 6) {
-        cmd_wz_arg = std::stof(argv[6]);
+        cmd_vy_arg = std::stof(argv[6]);
+    }
+    if (argc > 7) {
+        cmd_wz_arg = std::stof(argv[7]);
     }
     
     // Set default config based on mode
@@ -375,6 +465,14 @@ int main(int argc, char** argv) {
             config = "config.xml";
         }
     }
+    
+    // Load configuration from YAML file
+    std::cout << "=== Loading Configuration ===" << std::endl;
+    std::cout << "Config file: " << config_yaml << std::endl;
+    if (!loadConfigFromYAML(config_yaml)) {
+        std::cout << "[Config] Using default hardcoded values." << std::endl;
+    }
+    std::cout << "============================\n" << std::endl;
     
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
