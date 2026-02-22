@@ -18,11 +18,105 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+#include <termios.h>
+#include <fcntl.h>
+#include <thread>
+#include <mutex>
 
 // Signal handling
 volatile sig_atomic_t g_stop = 0;
 void handleSignal(int) {
     g_stop = 1;
+}
+
+// Keyboard input handling
+struct termios old_termios;
+bool keyboard_enabled = false;
+
+void setupKeyboard() {
+    struct termios new_termios;
+    tcgetattr(STDIN_FILENO, &old_termios);
+    new_termios = old_termios;
+    new_termios.c_lflag &= ~(ICANON | ECHO);
+    new_termios.c_cc[VMIN] = 0;
+    new_termios.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
+    fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+    keyboard_enabled = true;
+}
+
+void restoreKeyboard() {
+    if (keyboard_enabled) {
+        tcsetattr(STDIN_FILENO, TCSANOW, &old_termios);
+        keyboard_enabled = false;
+    }
+}
+
+// Command velocity with mutex protection
+std::mutex cmd_mutex;
+float cmd_vx = 0.0f;
+float cmd_vy = 0.0f;
+float cmd_wz = 0.0f;
+const float CMD_VEL_FORWARD_FIXED = 0.5f;  // Fixed velocity value
+const float CMD_VEL_BACKWARD_FIXED = 0.5f;  // Fixed velocity value
+const float CMD_VEL_LEFT_FIXED = 0.3f;  // Fixed velocity value
+const float CMD_VEL_RIGHT_FIXED = 0.3f;  // Fixed velocity value
+const float CMD_VEL_ROTATE_LEFT_FIXED = 0.9f;  // Fixed velocity value
+const float CMD_VEL_ROTATE_RIGHT_FIXED = 0.9f;  // Fixed velocity value
+const float CMD_VEL_STOP_FIXED = 0.0f;  // Fixed velocity value
+
+void updateCommandsFromKeyboard() {
+    char c;
+    
+    // Read all available characters
+    while (read(STDIN_FILENO, &c, 1) > 0) {
+        std::lock_guard<std::mutex> lock(cmd_mutex);
+        
+        switch (c) {
+            case 'w':
+            case 'W':
+                cmd_vx = CMD_VEL_FORWARD_FIXED;  // Forward
+                break;
+            case 's':
+            case 'S':
+                cmd_vx = -CMD_VEL_BACKWARD_FIXED;  // Backward
+                break;
+            default:
+                break;
+        }
+        switch (c) {
+            case 'a':
+            case 'A':
+                cmd_vy = CMD_VEL_LEFT_FIXED;  // Left
+                break;
+            case 'd':
+            case 'D':
+                cmd_vy = -CMD_VEL_RIGHT_FIXED;  // Right
+                break;
+            default:
+                break;
+        }
+        switch (c) {
+            case 'q':
+            case 'Q':
+                cmd_wz = CMD_VEL_ROTATE_LEFT_FIXED;  // Rotate left
+                break;
+            case 'e':
+            case 'E':
+                cmd_wz = -CMD_VEL_ROTATE_RIGHT_FIXED;  // Rotate right
+                break;
+            default:
+                break;
+            
+        }
+
+        if (c != 'w' && c != 's' && c != 'a' && c != 'd' && c != 'q' && c != 'e' 
+            && c != 'W' && c != 'S' && c != 'A' && c != 'D' && c != 'Q' && c != 'E') {
+            cmd_vx = 0.0f;
+            cmd_vy = 0.0f;
+            cmd_wz = 0.0f;
+        }
+    }
 }
 
 // Ankle solver configuration
@@ -141,16 +235,16 @@ const float PD_KD[15] = {
 };
 
 // Maximum torque limits for each motor (N·m) - aligned with heima_noarm_config.py
-const float MAX_TORQUE_LIMIT[15] = {
-    120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    150.0f, 150.0f, 150.0f  // Waist motors (if present)
-};
 // const float MAX_TORQUE_LIMIT[15] = {
-//     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
-//     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,   // Right leg
-//     400.0f, 400.0f, 400.0f
+//     120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+//     120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+//     150.0f, 150.0f, 150.0f  // Waist motors (if present)
 // };
+const float MAX_TORQUE_LIMIT[15] = {
+    3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
+    3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,   // Right leg
+    400.0f, 400.0f, 400.0f
+};
 
 // PD Control function
 float pdControl(float targetPos, float actualPos, float targetVel, float actualVel, float kp, float kd) {
@@ -246,9 +340,9 @@ int main(int argc, char** argv) {
     std::string mode = "sim";  // "sim" or "real"
     std::string onnx_file = "policy_heima_noarm.onnx";
     std::string config = "";  // gRPC server for sim, config.xml for real
-    float cmd_vx = 0.0f;
-    float cmd_vy = 0.0f;
-    float cmd_wz = 0.0f;
+    float cmd_vx_arg = 0.0f;
+    float cmd_vy_arg = 0.0f;
+    float cmd_wz_arg = 0.0f;
     
     // Parse command line arguments
     // Usage: ./main [mode] [onnx_file] [config] [vx] [vy] [wz]
@@ -264,13 +358,13 @@ int main(int argc, char** argv) {
         config = argv[3];
     }
     if (argc > 4) {
-        cmd_vx = std::stof(argv[4]);
+        cmd_vx_arg = std::stof(argv[4]);
     }
     if (argc > 5) {
-        cmd_vy = std::stof(argv[5]);
+        cmd_vy_arg = std::stof(argv[5]);
     }
     if (argc > 6) {
-        cmd_wz = std::stof(argv[6]);
+        cmd_wz_arg = std::stof(argv[6]);
     }
     
     // Set default config based on mode
@@ -285,11 +379,21 @@ int main(int argc, char** argv) {
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
     
+    // Setup keyboard input
+    setupKeyboard();
+    
     std::cout << "=== Heima RL Deployment ===" << std::endl;
     std::cout << "Mode: " << mode << std::endl;
     std::cout << "ONNX model: " << onnx_file << std::endl;
     std::cout << "Config: " << config << std::endl;
-    std::cout << "Commands: vx=" << cmd_vx << ", vy=" << cmd_vy << ", wz=" << cmd_wz << std::endl;
+    std::cout << "\n=== Keyboard Controls ===" << std::endl;
+    std::cout << "W/S: Forward/Backward (vx = ±" << CMD_VEL_FORWARD_FIXED << ")" << std::endl;
+    std::cout << "A/D: Left/Right (vy = ±" << CMD_VEL_LEFT_FIXED << ")" << std::endl;
+    std::cout << "Q/E: Rotate Left/Right (wz = ±" << CMD_VEL_ROTATE_LEFT_FIXED << ")" << std::endl;
+    std::cout << "Space: Stop all commands" << std::endl;
+    std::cout << "Enter: Print current commands" << std::endl;
+    std::cout << "Ctrl+C: Exit" << std::endl;
+    std::cout << "========================\n" << std::endl;
     
     // Initialize robot interface
     auto robot = createRobotInterface(mode, config);
@@ -340,7 +444,14 @@ int main(int argc, char** argv) {
     std::vector<float> previous_actions(12, 0.0f);
     std::vector<float> current_torques(12, 0.0f);  // Store current torque commands for logging
     
-    float commands[3] = {cmd_vx, cmd_vy, cmd_wz};
+    // Initialize commands from command line arguments
+    {
+        std::lock_guard<std::mutex> lock(cmd_mutex);
+        cmd_vx = cmd_vx_arg;  // Use command line values if provided
+        cmd_vy = cmd_vy_arg;
+        cmd_wz = cmd_wz_arg;
+    }
+    float commands[3] = {0.0f, 0.0f, 0.0f};
 
     // Open CSV file for logging observations
     std::ofstream csv_file("observations_log.csv");
@@ -493,6 +604,17 @@ int main(int argc, char** argv) {
     
     while (!g_stop) {
         auto cycle_start = std::chrono::steady_clock::now();
+        
+        // Update commands from keyboard input
+        updateCommandsFromKeyboard();
+        
+        // Get current commands (thread-safe)
+        {
+            std::lock_guard<std::mutex> lock(cmd_mutex);
+            commands[0] = cmd_vx;
+            commands[1] = cmd_vy;
+            commands[2] = cmd_wz;
+        }
         
         // Read sensors (every 1ms for high-frequency feedback)
         if (!robot->fetchObs(rpy, base_ang_vel, joint_pos, joint_vel)) {
@@ -658,6 +780,7 @@ int main(int argc, char** argv) {
     
     // Graceful shutdown
     std::cout << "\nShutting down..." << std::endl;
+    restoreKeyboard();
     robot->shutdown();
     
     // Close CSV file
