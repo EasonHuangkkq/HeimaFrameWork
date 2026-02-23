@@ -378,13 +378,18 @@ void buildObservation(
 ) {
     obs.resize(45);
     int idx = 0;
-    
-    // 1. Base angular velocity (scaled) - 3 dims
+        
+    // 1. Commands (scaled) - 3 dims
+    obs[idx++] = commands[0] * CMD_SCALE[0];
+    obs[idx++] = commands[1] * CMD_SCALE[1];
+    obs[idx++] = commands[2] * CMD_SCALE[2];
+
+    // 2. Base angular velocity (scaled) - 3 dims
     obs[idx++] = base_ang_vel[0] * ANG_VEL_SCALE;
     obs[idx++] = base_ang_vel[1] * ANG_VEL_SCALE;
     obs[idx++] = base_ang_vel[2] * ANG_VEL_SCALE;
     
-    // 2. Projected gravity - 3 dims
+    // 3. Projected gravity - 3 dims
     // Compute rotation matrix from RPY
     float R[9];
     rpyToRotationMatrix(rpy[0], rpy[1], rpy[2], R);
@@ -397,12 +402,7 @@ void buildObservation(
     obs[idx++] = projected_gravity[0];
     obs[idx++] = projected_gravity[1];
     obs[idx++] = projected_gravity[2];
-    
-    // 3. Commands (scaled) - 3 dims
-    obs[idx++] = commands[0] * CMD_SCALE[0];
-    obs[idx++] = commands[1] * CMD_SCALE[1];
-    obs[idx++] = commands[2] * CMD_SCALE[2];
-    
+
     // 4. DOF positions (relative to default, scaled) - 12 dims
     for (int i = 0; i < 12; ++i) {
         float pos_rel = joint_pos[i] - DEFAULT_JOINT_ANGLES[i];
