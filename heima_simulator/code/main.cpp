@@ -320,16 +320,16 @@ bool loadConfigFromYAML(const std::string& config_path) {
 }
 
 // Maximum torque limits for each motor (N·m) - aligned with heima_noarm_config.py
-// const float MAX_TORQUE_LIMIT[15] = {
-//     120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-//     120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-//     150.0f, 150.0f, 150.0f  // Waist motors (if present)
-// };
 const float MAX_TORQUE_LIMIT[15] = {
-    3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
-    3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,   // Right leg
-    400.0f, 400.0f, 400.0f
+    120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    150.0f, 150.0f, 150.0f  // Waist motors (if present)
 };
+// const float MAX_TORQUE_LIMIT[15] = {
+//     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
+//     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,   // Right leg
+//     400.0f, 400.0f, 400.0f
+// };
 
 // PD Control function
 float pdControl(float targetPos, float actualPos, float targetVel, float actualVel, float kp, float kd) {
