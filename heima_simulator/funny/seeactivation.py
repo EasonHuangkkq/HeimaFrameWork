@@ -2,6 +2,10 @@ import numpy as np
 import onnxruntime as ort
 import torch
 import torch.nn as nn
+import matplotlib.pyplot as plt
+import imageio
+import os
+from tqdm import tqdm
 
 
 def run_onnx(onnx_model, observation, actions=None):
@@ -167,22 +171,46 @@ def load_pt_model(pt_path, model_type='actor'):
             elif has_log_std:
                 self.log_std = nn.Parameter(torch.zeros(output_dim))
         
-        def forward(self, obs):
+        def forward(self, obs, return_intermediates=False):
             # obs should be (batch_size, obs_dim) or (obs_dim,)
-            if obs.ndim == 1:
+            was_1d = obs.ndim == 1
+            if was_1d:
                 obs = obs.unsqueeze(0)
             
             # Normalize
             x = self.obs_normalizer(obs)
+            intermediates = {'normalized_obs': x.clone()}
             
-            # MLP
-            output = self.mlp(x)
+            # MLP - manually step through to capture intermediate values
+            current = x
+            linear_idx = 0
+            
+            for i, layer in enumerate(self.mlp):
+                current = layer(current)
+                
+                # Store output after each operation
+                if isinstance(layer, nn.Linear):
+                    intermediates[f'linear_{linear_idx}_out'] = current.clone()
+                    linear_idx += 1
+                elif isinstance(layer, nn.ELU):
+                    intermediates[f'elu_{linear_idx - 1}_out'] = current.clone()
+                else:
+                    intermediates[f'layer_{i}_out'] = current.clone()
+            
+            output = current
             
             # Squeeze batch dimension if input was 1D
-            if obs.shape[0] == 1 and obs.ndim == 2:
+            if was_1d:
                 output = output.squeeze(0)
+                for key in intermediates:
+                    if intermediates[key].ndim > 1 and intermediates[key].shape[0] == 1:
+                        intermediates[key] = intermediates[key].squeeze(0)
             
-            return output
+            if return_intermediates:
+                intermediates['final_output'] = output
+                return intermediates
+            else:
+                return output
     
     # Create model and load state dict
     model = SimpleActorModel()
@@ -204,9 +232,155 @@ def load_pt_model(pt_path, model_type='actor'):
     return model
 
 
+def make_activation_video(activation_list, output_path, video_name="activation_video", fps=10):
+    """
+    Create a video from a list of activation arrays, where each element becomes a frame.
+    
+    Args:
+        activation_list: List of numpy arrays, each representing activations at a timestep
+        output_path: Directory path where the video will be saved
+        video_name: Name of the output video file (without extension)
+        fps: Frames per second for the video
+    """
+    os.makedirs(os.path.join(output_path, "videos"), exist_ok=True)
+    os.makedirs(os.path.join(output_path, "videos", "tmp"), exist_ok=True)
+    
+    # Convert to numpy array and compute consistent global color range across all frames
+    activation_array = np.array(activation_list)
+    vmin, vmax = activation_array.min(), activation_array.max()
+    
+    # Create a frame for each activation
+    for idx, activation in enumerate(tqdm(activation_list, desc="Creating frames")):
+        fig, ax = plt.subplots(figsize=(8, 6))
+        data = np.array(activation)
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+        im = ax.imshow(data, aspect="auto", vmin=vmin, vmax=vmax, cmap="viridis")
+        fig.colorbar(im, ax=ax, fraction=0.03, pad=0.02)  # narrow bar, close to axes
+        ax.set_title(f"step {idx}")
+        fig.tight_layout()
+        fig.savefig(os.path.join(output_path, "videos", "tmp", f"activation_{idx:05d}.png"), dpi=120)
+        plt.close(fig)
+    
+    # Merge the images into a mp4 video using imageio + ffmpeg
+    num_frames = len(activation_list)
+    frames = [imageio.imread(os.path.join(output_path, "videos", "tmp", f"activation_{idx:05d}.png")) 
+              for idx in range(num_frames)]
+    imageio.mimwrite(os.path.join(output_path, "videos", f"{video_name}.mp4"), frames, fps=fps, codec="libx264")
+    
+    print(f"Video saved to: {os.path.join(output_path, 'videos', f'{video_name}.mp4')}")
+
+
+def make_all_elu_video(elu_outputs_list, output_path, video_name="all_elu_outputs", fps=10):
+    """
+    Create a video from a list of dictionaries containing all ELU outputs, 
+    where each frame shows all ELU outputs stacked vertically.
+    
+    Args:
+        elu_outputs_list: List of dictionaries, each containing ELU outputs for one timestep
+                          Keys should be like 'elu_0_out', 'elu_1_out', etc.
+        output_path: Directory path where the video will be saved
+        video_name: Name of the output video file (without extension)
+        fps: Frames per second for the video
+    """
+    os.makedirs(os.path.join(output_path, "videos"), exist_ok=True)
+    os.makedirs(os.path.join(output_path, "videos", "tmp"), exist_ok=True)
+    
+    # Get all ELU keys from the first timestep
+    if len(elu_outputs_list) == 0:
+        print("No ELU outputs to visualize")
+        return
+    
+    elu_keys = sorted([k for k in elu_outputs_list[0].keys() if k.startswith('elu_')])
+    if len(elu_keys) == 0:
+        print("No ELU outputs found")
+        return
+    
+    # Collect all values to compute global color range
+    # Since different ELU layers may have different dimensions, we collect all values first
+    all_values = []
+    for elu_dict in elu_outputs_list:
+        for key in elu_keys:
+            val = np.array(elu_dict[key])
+            all_values.append(val.flatten())
+    
+    # Concatenate all values and compute statistics
+    all_values_flat = np.concatenate(all_values)
+    vmin = all_values_flat.min()
+    # Strip away top 1% when computing vmax (use 99th percentile)
+    vmax = np.percentile(all_values_flat, 99)
+    
+    # Create a frame for each timestep with all ELU outputs stacked
+    for idx, elu_dict in enumerate(tqdm(elu_outputs_list, desc="Creating frames")):
+        num_elu = len(elu_keys)
+        fig, axes = plt.subplots(num_elu, 1, figsize=(10, 2 * num_elu))
+        
+        # Handle single subplot case
+        if num_elu == 1:
+            axes = [axes]
+        
+        for ax_idx, elu_key in enumerate(elu_keys):
+            data = np.array(elu_dict[elu_key])
+            if data.ndim == 1:
+                data = data.reshape(1, -1)
+            
+            im = axes[ax_idx].imshow(data, aspect="auto", vmin=vmin, vmax=vmax, cmap="viridis")
+            axes[ax_idx].set_title(f"{elu_key} - step {idx}")
+            axes[ax_idx].set_ylabel("Neuron")
+            if ax_idx == len(elu_keys) - 1:
+                axes[ax_idx].set_xlabel("Time")
+            plt.colorbar(im, ax=axes[ax_idx], fraction=0.03, pad=0.02)
+        
+        fig.tight_layout()
+        fig.savefig(os.path.join(output_path, "videos", "tmp", f"all_elu_{idx:05d}.png"), dpi=120)
+        plt.close(fig)
+    
+    # Merge the images into a mp4 video
+    num_frames = len(elu_outputs_list)
+    frames = [imageio.imread(os.path.join(output_path, "videos", "tmp", f"all_elu_{idx:05d}.png")) 
+              for idx in range(num_frames)]
+    imageio.mimwrite(os.path.join(output_path, "videos", f"{video_name}.mp4"), frames, fps=fps, codec="libx264")
+    
+    print(f"Video saved to: {os.path.join(output_path, 'videos', f'{video_name}.mp4')}")
+
+
 if __name__ == "__main__":
     model = load_pt_model("/home/yao/Desktop/repo/heima/mujoco_approach/mjlab/logs/rsl_rl/heima_armless_velocity/2026-02-23_15-55-40/model_15550.pt")
     obs = np.random.randn(10, 45)
     actions = model(torch.from_numpy(obs).float())
     print(actions.shape)
     print(actions)
+
+    # read observations.csv and actions.csv
+    import pandas as pd
+    observations = pd.read_csv("/home/yao/Desktop/repo/heima/latest_deploy/HeimaFrameWork/heima_simulator/code/build/observations.csv", header=None)
+    actions = pd.read_csv("/home/yao/Desktop/repo/heima/latest_deploy/HeimaFrameWork/heima_simulator/code/build/actions.csv", header=None)
+    # calculated_actions = model(torch.from_numpy(observations.values).float())
+
+    # calculated_actions_onnx = run_onnx("/home/yao/Desktop/repo/heima/mujoco_approach/mjlab/logs/rsl_rl/heima_armless_velocity/2026-02-23_15-55-40/model_15550.onnx", observations.values[0])
+
+    # print(actions.values - calculated_actions.detach().numpy())
+    # print(actions.values[0] - calculated_actions_onnx)
+
+    # exit()
+    # Collect all ELU outputs for each observation
+    all_elu_outputs = []
+    for obs in observations.values[100:]:
+        calculated_actions = model(torch.from_numpy(obs).float(), return_intermediates=True)
+        # Extract all ELU outputs and convert to numpy
+        elu_dict = {}
+        for key, value in calculated_actions.items():
+            if key.startswith('elu_'):
+                elu_dict[key] = value.detach().numpy()
+        all_elu_outputs.append(elu_dict)
+
+    # Create video with all ELU outputs in the same frame
+    output_dir = "/home/yao/Desktop/repo/heima/latest_deploy/HeimaFrameWork/heima_simulator/funny/build"
+    make_all_elu_video(all_elu_outputs, output_dir, video_name="all_elu_outputs", fps=10)
+    
+    # Optionally also plot heatmap
+    # import matplotlib.pyplot as plt
+    # plt.imshow(tmp, aspect="auto")
+    # plt.colorbar()
+    # plt.show()
+    exit()

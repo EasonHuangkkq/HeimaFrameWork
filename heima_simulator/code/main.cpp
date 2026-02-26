@@ -553,6 +553,11 @@ int main(int argc, char** argv) {
 
     // Open CSV file for logging observations
     std::ofstream csv_file("observations_log.csv");
+    std::ofstream obs_log_file("observations.csv");
+    obs_log_file << std::fixed << std::setprecision(6);
+    std::ofstream actions_log_file("actions.csv");
+    actions_log_file << std::fixed << std::setprecision(6);
+    
     if (!csv_file.is_open()) {
         std::cerr << "Warning: Failed to open CSV file for logging" << std::endl;
     } else {
@@ -767,6 +772,22 @@ int main(int argc, char** argv) {
                 std::cerr << "Inference failed!" << std::endl;
                 break;
             }
+
+            if (obs_log_file.is_open()) {
+                for (int i = 0; i < 45; ++i) {
+                    obs_log_file << observation[i];
+                    if (i < 44) obs_log_file << ",";
+                }
+                obs_log_file << "\n";
+            }
+
+            if (actions_log_file.is_open()) {
+                for (int i = 0; i < 12; ++i) {
+                    actions_log_file << actions[i];
+                    if (i < 11) actions_log_file << ",";
+                }
+                actions_log_file << "\n";
+            }
             
             // Update previous actions
             previous_actions = actions;
@@ -885,6 +906,15 @@ int main(int argc, char** argv) {
     if (csv_file.is_open()) {
         csv_file.close();
         std::cout << "CSV log saved: observations_log.csv (" << policy_count << " samples @ 50Hz)" << std::endl;
+    }
+
+    if (obs_log_file.is_open()) {
+        obs_log_file.close();
+        std::cout << "Observations log saved: observations.csv (" << policy_count << " samples @ 50Hz)" << std::endl;
+    }
+    if (actions_log_file.is_open()) {
+        actions_log_file.close();
+        std::cout << "Actions log saved: actions.csv (" << policy_count << " samples @ 50Hz)" << std::endl;
     }
     
     std::cout << "Done." << std::endl;
