@@ -275,7 +275,7 @@
      i = 0;
      if(maxCurrent.size() == 0){
          while(i < dofAll){
-             maxCurrent.push_back(1000);
+             maxCurrent.push_back(1500);
              i++;
          }
      }else if(maxCurrent.size() != dofAll){
