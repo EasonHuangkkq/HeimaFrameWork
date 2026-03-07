@@ -1,0 +1,2 @@
+/usr/bin/ar qc libankle_solver.a CMakeFiles/ankle_solver.dir/ankle_solver/cpp/ankle_solver.cpp.o
+/usr/bin/ranlib libankle_solver.a

@@ -1,0 +1,236 @@
+cmake_minimum_required(VERSION 3.10)
+
+# ==========================================
+# 项目配置
+# ==========================================
+project(HeimaDriverSDK VERSION 1.0 LANGUAGES CXX)
+
+# C++20 标准
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+# Release 模式优化级别
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+
+# ==========================================
+# 公共源文件集合（模块化定义）
+# ==========================================
+
+# 核心源文件（不依赖 IMU）
+set(HEIMA_SDK_CORE_SRCS
+    heima_driver_sdk.cpp
+    ecat.cpp
+    rs485.cpp
+    can.cpp
+)
+
+# IMU 相关源文件（可选，通过 ENABLE_RS232 控制）
+set(HEIMA_SDK_IMU_SRCS
+    rs232.cpp
+    yesense_imu.cpp
+    yesense/src/yesense_decoder.cpp
+    yesense/src/yesense_std_out_decoder.cpp
+)
+
+# 配置和工具源文件
+set(HEIMA_SDK_CONFIG_SRCS
+    common.cpp
+    config_xml.cpp
+    tinyxml2.cpp
+)
+
+# ==========================================
+# 查找依赖库
+# ==========================================
+
+# 头文件路径
+include_directories(
+    ${PROJECT_SOURCE_DIR}
+    /usr/local/include
+    /usr/include
+)
+
+# 查找 EtherCAT 库（强制使用 /usr/local/lib）
+find_library(ETHERCAT_LIB ethercat
+    PATHS /usr/local/lib
+    NO_DEFAULT_PATH
+    REQUIRED
+)
+
+# 查找 pthread
+find_package(Threads REQUIRED)
+
+message(STATUS "Found EtherCAT Lib: ${ETHERCAT_LIB}")
+
+# ==========================================
+# 1. 基础工具库（不含 IMU）
+# ==========================================
+add_library(driver_sdk_base SHARED
+    ${HEIMA_SDK_CORE_SRCS}
+    ${HEIMA_SDK_CONFIG_SRCS}
+)
+
+target_link_libraries(driver_sdk_base PUBLIC
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+# ==========================================
+# 2. 完整工具库（包含 IMU）
+# ==========================================
+add_library(driver_sdk_full SHARED
+    ${HEIMA_SDK_CORE_SRCS}
+    ${HEIMA_SDK_CONFIG_SRCS}
+    ${HEIMA_SDK_IMU_SRCS}
+)
+
+target_link_libraries(driver_sdk_full PUBLIC
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+# 编译定义（IMU 部分需要）
+target_compile_definitions(driver_sdk_full PRIVATE ENABLE_RS232)
+
+# ==========================================
+# 3. 可执行文件：Leg 测试
+# ==========================================
+add_executable(leg_smoke_test
+    leg_smoke_test.cpp
+)
+
+target_link_libraries(leg_smoke_test PUBLIC
+    driver_sdk_base
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+# ==========================================
+# 4. 可执行文件：Arm 测试
+# ==========================================
+add_executable(arm_smoke_test
+    arm_smoke_test.cpp
+)
+
+target_link_libraries(arm_smoke_test PUBLIC
+    driver_sdk_base
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+# ==========================================
+# 5. 可执行文件：全身测试（带 IMU）
+# ==========================================
+add_executable(whole_body_smoke_test
+    whole_body_smoke_test.cpp
+)
+
+target_link_libraries(whole_body_smoke_test PUBLIC
+    driver_sdk_full
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+target_compile_definitions(whole_body_smoke_test PRIVATE ENABLE_RS232)
+
+# ==========================================
+# 6. C ABI 兼容库（Python ctypes 友好）
+# ==========================================
+add_library(heima_sdk_c SHARED
+    ${HEIMA_SDK_CORE_SRCS}
+    ${HEIMA_SDK_CONFIG_SRCS}
+    ${HEIMA_SDK_IMU_SRCS}
+)
+
+target_link_libraries(heima_sdk_c PUBLIC
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+target_compile_definitions(heima_sdk_c PRIVATE ENABLE_RS232)
+
+# ==========================================
+# 7. loong_base-main 兼容库（exports namespace DriverSDK）
+# ==========================================
+add_library(loong_driver_sdk SHARED
+    ${HEIMA_SDK_CORE_SRCS}
+    ${HEIMA_SDK_CONFIG_SRCS}
+    ${HEIMA_SDK_IMU_SRCS}
+)
+
+target_link_libraries(loong_driver_sdk PUBLIC
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
+target_compile_definitions(loong_driver_sdk PRIVATE ENABLE_RS232)
+
+# ==========================================
+# 安装配置
+# ==========================================
+set(INSTALL_TARGETS
+    driver_sdk_base
+    driver_sdk_full
+    leg_smoke_test
+    arm_smoke_test
+    whole_body_smoke_test
+    heima_sdk_c
+    loong_driver_sdk
+)
+
+# 如果存在 main.cpp，添加 run_motor 目标
+if(EXISTS "${PROJECT_SOURCE_DIR}/main.cpp")
+    add_executable(run_motor main.cpp)
+    target_link_libraries(run_motor PUBLIC driver_sdk_base)
+    list(APPEND INSTALL_TARGETS run_motor)
+endif()
+
+# 安装目标
+install(TARGETS ${INSTALL_TARGETS}
+    RUNTIME DESTINATION .
+    LIBRARY DESTINATION .
+)
+
+# ==========================================
+# 说明
+# ==========================================
+#
+# 构建目标说明：
+#
+# driver_sdk_base:
+#   - 仅包含核心源文件（ecat, can, rs485, common, config_xml, tinyxml2）
+#   - 不包含 IMU（rs232, yesense）
+#   - 用于不需要 IMU 的测试程序
+#
+# driver_sdk_full:
+#   - 包含所有源文件（包括 IMU）
+#   - 用于需要完整功能的程序
+#
+# leg_smoke_test / arm_smoke_test:
+#   - 腿/臂单测，链接 driver_sdk_base（不含 IMU）
+#
+# whole_body_smoke_test:
+#   - 全身测试，链接 driver_sdk_full（含 IMU）
+#
+# heima_sdk_c:
+#   - Python ctypes 友好版本，导出 C ABI
+#   - 所有函数前加 extern "C"
+#
+# loong_driver_sdk:
+#   - loong_base-main 兼容版本，导出 namespace DriverSDK
+#   - 与原版 API 完全一致
+#
+# 使用方式：
+#
+# 编译所有目标: cmake --build . -j4
+# 仅编译 driver_sdk_base: cmake --build . --target driver_sdk_base
+# 编译 loong_driver_sdk: cmake --build . --target loong_driver_sdk
+#
+# ==========================================

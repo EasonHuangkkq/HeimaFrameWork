@@ -1,16 +1,16 @@
 # AGENTS.md — heimaFrameWork workspace instructions
 
-This repository is a *workspace bundle* of several OpenLoong-related subprojects (flattened as `*-main/`) plus a driver SDK source copy (`heimaSDK_copy/`). Each subproject has its own build/run scripts and slightly different conventions.
+This repository is a *workspace bundle* of several OpenLoong-related subprojects (flattened as `*-main/`) plus a driver SDK source copy (`heimaSDK/`). Each subproject has its own build/run scripts and slightly different conventions.
 
 ## Scope + existing agent rules
 - Root-level agent instructions live in this file.
 - Additional agent rules exist at:
-  - `heimaSDK_copy/AGENTS.md` (applies only inside `heimaSDK_copy/`).
+  - `heimaSDK/AGENTS.md` (applies only inside `heimaSDK/`).
 - No Cursor rules were found (`.cursorrules` or `.cursor/rules/`).
 - No Copilot rules were found (`.github/copilot-instructions.md`).
 
 ## Repo map (high level)
-- `heimaSDK_copy/`: EtherCAT/CAN/RS232/RS485 DriverSDK source (hardware-facing).
+- `heimaSDK/`: EtherCAT/CAN/RS232/RS485 DriverSDK source (hardware-facing).
 - `loong_utility-main/`: shared C++ utility library + style doc (`代码规范new.md`).
 - `loong_ctrl_locomotion-main/`: locomotion algorithm library (Nabo-style, produces `libnabo_*.so`).
 - `loong_base-main/`: multi-process “business main” (driver/locomotion/interface tasks).
@@ -109,26 +109,47 @@ Some CMake files assume the original repo layout (e.g. `include(../loong_utility
 ## Code style + conventions (C/C++)
 
 ### Canonical style doc
-- Follow `loong_utility-main/代码规范new.md` for the `loong_*` projects unless the local directory’s code indicates otherwise.
+- Follow `heimaSDK_copy/代码规范.md` and `loong_utility-main/代码规范new.md`.
+- Core principle: **最小完备性** — 功能完备、代码最简、结构简明。
 
-### Formatting (observed in `loong_*`)
-- Compact style is common:
-  - `if(x){...}else{...}` (braces on same line)
-  - Often no space after keywords: `if(`, `for(`, `while(`
-  - Includes commonly appear as `#include"file.h"` or `#include<vec>` (no space after `#include`).
-- Many files use tabs for indentation; preserve the existing file’s indentation style.
+### Formatting (strict rules from 代码规范.md)
+- **花括号紧跟主体**，不另起一行。`}else{` 必须在同一行，充分利用屏幕纵向空间。
+- `if`/`for`/`while` 主体**必须加花括号**，即便仅有单行。
+- **关键词后不加空格**：`if(`、`for(`、`while(`，函数名后同样：`goodFun(int good){`。
+- **空格仅用于计算逻辑分割或对齐**，不用无意义空格：
+  - 加减号前空格区分逻辑块：`good=abc*bcde*cde +de*efgh/fghi -gh*hij;`
+  - 逗号后空格数量灵活，用于行列对齐。
+  - 等号周围空格用于行对齐。
+- Includes: `#include"file.h"` or `#include<vec>` (no space).
+- Preserve existing file's indentation style (tabs or spaces).
 
-### Naming
-- Files: lower_snake_case (see `share_mem.*`, `data_center.*`).
-- Variables (compute-heavy code): lowerCamelCase, avoid underscores.
+### Naming (strict rules)
+- **小驼峰命名**（lowerCamelCase），不使用下划线。
+- **首字母小写**，便于键入。
+- **仅两种情况允许首字母大写**：
+  - (A) 矩阵变量，匹配数学含义。
+  - (B) 全局量：namespace、`#define`、`const` 等。`#define` 用大驼峰，**严禁全大写**。
+- Files: lower_snake_case with underscore separator.
+- **常用缩写词缀**：
+  - 前缀：`cmd-`(命令值)、`tgt-`(目标值)、`act-`(实际值)、`est-`(估计值)
+  - 后缀：`-P`(位置)、`-V`(速度)、`-W`(角速度)、`-F`(力)、`-T`(关节扭矩)、`-M`(空间力矩)
 - Types:
-  - `struct` = data container (may have `init/reset`), minimal logic.
-  - `class` = encapsulates logic.
-  - Common suffix pattern in code: `*Class` / `*Struct` (e.g. `shareMemClass`, `logClass`).
-- Units & frames (from `代码规范new.md`):
-  - Default units are SI (meters, radians, seconds, kilograms, Newton, N·m).
+  - `struct` = 数据结构，可包含 `init`/`reset` 等基本方法，不包含复杂逻辑。
+  - `class` = 具备逻辑运算功能的封装。
+  - Suffix pattern: `*Class` / `*Struct` (e.g. `shareMemClass`).
+- Units & frames:
+  - Default units: SI (meters, radians, seconds, kilograms, Newton, N·m).
+  - 特殊单位须在变量名中体现（如毫秒、协议缩放值）。
   - Coordinate frame: z-up, x-forward, right-handed.
-  - Euler order: zyx (yaw/pitch/roll).
+  - Euler order: zyx (yaw/pitch/roll), rotation: right-hand screw positive.
+
+### Logic structure (strict rules)
+- 模块功能封装（面向对象），调用逻辑紧凑（面向过程）。
+- 不常用的库不要 `#include` 到 `.h` 文件，用 pImpl 封装在 `.cpp` 内。
+- 避免过多层级、多文件分散嵌套。
+- **单文件超过 1000 行时，考虑模块拆分**。
+- 减少复杂模板和飞针（指针传递/cast/move 语义）。
+- 利用**单例设计模式**封装带唯一性或跨域需求的模块。
 
 ### Types / math
 - Prefer project aliases from `loong_utility-main/src/eigen.h`:

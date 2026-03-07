@@ -1,0 +1,183 @@
+import numpy as np
+import math
+from scipy.optimize import fsolve
+
+
+class AnkleSolver:
+    def __init__(self):
+        # self.l1 = l1
+        # self.d1 = d1
+        # self.m = m
+        # self.n = n
+
+        # self.h1 = h1
+        # self.h2 = h2
+
+        # self.r_E = r_E
+        # self.r_F = r_F
+        pass
+
+    def solve(self, pitch, roll):
+        def constraint_equation(theta_f):
+            t = []
+            for i in theta_f:
+                v = self.get_distance(self.get_D_after_rotation(pitch, roll), self.get_F(i)) - 232.273
+                t.append(v)
+            return np.array(t)
+        theta_f = fsolve(constraint_equation, 0)
+        print(f"theta_f: {theta_f}")
+        print(f"constraint_equation(theta_f): {constraint_equation(theta_f)}")
+
+        def constraint_equation(theta_e):
+            t = []
+            for i in theta_e:
+                v = self.get_distance(self.get_E(i), self.get_C_after_rotation(pitch, roll)) - 313.837
+                t.append(v)
+            return np.array(t)
+        theta_e = fsolve(constraint_equation, 0)
+        print(f"theta_e: {theta_e}")
+        print(f"constraint_equation(theta_e): {constraint_equation(theta_e)}")
+
+        return theta_f, theta_e
+    
+    def solve_inverse(self, theta_e, theta_f):
+        """
+        Inverse solve: given theta_e and theta_f, compute pitch and roll.
+        
+        Args:
+            theta_e: ankle pitch motor angle (left)
+            theta_f: ankle roll motor angle (right)
+            
+        Returns:
+            (pitch, roll): computed ankle pitch and roll angles
+        """
+        def constraint_equations(x):
+            pitch, roll = x
+            # Constraint 1: distance(D_after_rotation, F(theta_f)) = 232.273
+            residual_f = self.get_distance(
+                self.get_D_after_rotation(pitch, roll), 
+                self.get_F(theta_f)
+            ) - 232.273
+            
+            # Constraint 2: distance(E(theta_e), C_after_rotation) = 313.837
+            residual_e = self.get_distance(
+                self.get_E(theta_e), 
+                self.get_C_after_rotation(pitch, roll)
+            ) - 313.837
+            
+            return [residual_f, residual_e]
+        
+        # Initial guess for pitch and roll
+        initial_guess = [0.0, 0.0]
+        solution = fsolve(constraint_equations, initial_guess)
+        pitch, roll = solution
+        
+        print(f"pitch: {pitch}, roll: {roll}")
+        print(f"constraint_equations([pitch, roll]): {constraint_equations([pitch, roll])}")
+        
+        return pitch, roll
+    
+    def get_DF(self, pitch, roll, theta_f):
+        return self.get_distance(self.get_D_after_rotation(pitch, roll), self.get_F(theta_f))
+    
+    def get_CE(self, pitch, roll, theta_e):
+        return self.get_distance(self.get_C_after_rotation(pitch, roll), self.get_E(theta_e))
+
+    def get_distance(self, coordinate1, coordinate2):
+        return np.linalg.norm(coordinate1 - coordinate2)
+
+    def get_E(self, theta):
+        temp = np.array([-65, 0, 0])
+        temp = self.apply_rotation_y(temp, theta)
+        temp = temp + np.array([-22, 34.5, 313.837])
+        return temp
+
+    def get_F(self, theta):
+        temp = np.array([-65, 0, 0])
+        temp = self.apply_rotation_y(temp, theta)
+        temp = temp + np.array([-12, -34.5, 232.273])
+        return temp
+
+    def get_D_after_rotation(self, pitch, roll):
+        temp_d = np.array([-69, -35, 0])
+        return self.get_coord_after_pitch_roll(temp_d, pitch, roll)
+    
+    def get_C_after_rotation(self, pitch, roll):
+        temp_c = np.array([-69, 35, 0])
+        return self.get_coord_after_pitch_roll(temp_c, pitch, roll)
+    
+    def get_coord_after_pitch_roll(self, coordinate, pitch, roll):
+        coordinate = self.apply_rotation_x(coordinate, roll)
+        coordinate = self.apply_rotation_y(coordinate, pitch)
+        return coordinate
+
+    def apply_rotation_x(self, coordinate, angle):
+        # multiply the coordinate by rotaion matrix around x axis
+        rotation_matrix = np.array([
+            [1, 0, 0], 
+            [0, math.cos(angle), -math.sin(angle)], 
+            [0, math.sin(angle), math.cos(angle)]
+            ])
+        return rotation_matrix @ coordinate
+
+    def apply_rotation_y(self, coordinate, angle):
+        # multiply the coordinate by rotaion matrix around y axis
+        rotation_matrix = np.array([
+            [math.cos(angle), 0, math.sin(angle)],
+            [0, 1, 0],
+            [-math.sin(angle), 0, math.cos(angle)]
+            ])
+        return rotation_matrix @ coordinate
+
+if __name__ == "__main__":
+
+    h1 = 313.837
+    h2 = 232.273
+
+    m = 316.55
+    n = 232.27
+
+    r_E = 65 # might be wrong
+    r_F = 65 # might be wrong
+    l1 = 69 - 22
+
+    d1 = 35
+
+    ankle_solver = AnkleSolver()
+    coordinate_c = np.array([-l1, d1, 0])
+    print(f"coordinate_c: {coordinate_c}")
+
+    coordinate_c_after_pitch_roll = ankle_solver.get_coord_after_pitch_roll(coordinate_c, math.pi/6, 0)
+    print(f"coordinate_c_after_pitch_roll: {coordinate_c_after_pitch_roll}")
+
+    coordinate_e = ankle_solver.get_E(0)
+    print(f"coordinate_e: {coordinate_e}")
+
+    coordinate_f = ankle_solver.get_F(0)
+    print(f"coordinate_f: {coordinate_f}")
+
+    theta_f, theta_e = ankle_solver.solve(0.0, 0.6)
+    print(f"theta_f: {theta_f}, theta_e: {theta_e}")
+
+    # Test inverse solve (round-trip verification)
+    print("\n=== Testing inverse solve ===")
+    print("Forward solve: pitch=0.2, roll=0.3 -> theta_f, theta_e")
+    test_pitch = 0.2
+    test_roll = 0.3
+    theta_f_result, theta_e_result = ankle_solver.solve(test_pitch, test_roll)
+    
+    print(f"\nInverse solve: theta_f={theta_f_result}, theta_e={theta_e_result} -> pitch, roll")
+    pitch_result, roll_result = ankle_solver.solve_inverse(theta_e_result[0], theta_f_result[0])
+    
+    print(f"\n=== Round-trip error ===")
+    print(f"Original pitch: {test_pitch}, Recovered pitch: {pitch_result}, Error: {abs(test_pitch - pitch_result)}")
+    print(f"Original roll: {test_roll}, Recovered roll: {roll_result}, Error: {abs(test_roll - roll_result)}")
+
+    # draw df
+    # import matplotlib.pyplot as plt
+    # df = []
+    # for i in np.linspace(-math.pi, math.pi, 100):
+    #     df.append(ankle_solver.get_CE(0, 0, i))
+    # plt.plot(df)
+    # plt.show()
+
