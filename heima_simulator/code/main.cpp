@@ -536,8 +536,9 @@ int main(int argc, char** argv) {
     // Build per-motor maxCurrent vector for SDK
     std::vector<unsigned short> maxCurrentVec(MAX_CURRENT_SDK, MAX_CURRENT_SDK + 15);
     
-    // Initialize robot interface (pass ecatCpu for SDK thread binding)
-    auto robot = createRobotInterface(mode, config, maxCurrentVec, ThreadEcatCpu);
+    // Initialize robot interface (pass ecatCpu for SDK thread binding, opMode=5 for PVT)
+    int opMode = (mode == "real" || mode == "robot") ? 5 : 10;  // PVT for real, CST for sim
+    auto robot = createRobotInterface(mode, config, maxCurrentVec, ThreadEcatCpu, opMode);
     if (!robot) {
         std::cerr << "Failed to create robot interface" << std::endl;
         return 1;
@@ -630,12 +631,12 @@ int main(int argc, char** argv) {
         std::cout << "CSV logging enabled: observations_log.csv" << std::endl;
     }
 
-    // Stage 2: Move to default position using PD control (REAL ROBOT ONLY)
-    if (mode == "real" || mode == "robot") {
-        std::cout << "\nStage 2: Moving to default position..." << std::endl;
+    // Stage 2: Move to default position using PVT (REAL ROBOT ONLY)
+    if(mode == "real" || mode == "robot"){
+        std::cout << "\nStage 2: Moving to default position (PVT mode)..." << std::endl;
         
         // Fetch initial state
-        if (!robot->fetchObs(rpy, base_ang_vel, joint_pos, joint_vel)) {
+        if(!robot->fetchObs(rpy, base_ang_vel, joint_pos, joint_vel)){
             std::cerr << "Failed to fetch initial state" << std::endl;
             return 1;
         }
@@ -648,84 +649,56 @@ int main(int argc, char** argv) {
         const int hold_ticks = 10000;          // 10 seconds hold at default
         int stage2_ticks = 0;
         
-        while (!g_stop && stage2_ticks < (interpolation_ticks + hold_ticks)) {
-        // while (!g_stop) {
+        // Prepare PVT vectors (15 motors)
+        std::vector<float> tgtPos(15, 0.0f);
+        std::vector<float> tgtVel(15, 0.0f);
+        std::vector<float> tgtTor(15, 0.0f);
+        std::vector<float> tgtKp(PD_KP, PD_KP +15);
+        std::vector<float> tgtKd(PD_KD, PD_KD +15);
+        
+        while(!g_stop && stage2_ticks < (interpolation_ticks + hold_ticks)){
             // Fetch current state
-            if (!robot->fetchObs(rpy, base_ang_vel, joint_pos, joint_vel)) {
+            if(!robot->fetchObs(rpy, base_ang_vel, joint_pos, joint_vel)){
                 std::cerr << "Failed to fetch state during initialization" << std::endl;
                 return 1;
             }
-
             
             // Calculate interpolation factor (0 to 1)
             float alpha = 1.0f;
-            if (stage2_ticks < interpolation_ticks) {
-                alpha = static_cast<float>(stage2_ticks) / static_cast<float>(interpolation_ticks);
+            if(stage2_ticks < interpolation_ticks){
+                alpha = static_cast<float>(stage2_ticks) /static_cast<float>(interpolation_ticks);
             }
             
-            // Interpolate target positions (15 elements for ankle solver compatibility)
-            float target_pos[15];
-            for (int i = 0; i < 15; ++i) {
-                if (i < 12) {
-                    target_pos[i] = initial_positions[i] * (1.0f - alpha) + DEFAULT_JOINT_ANGLES[i] * alpha;
-                } else {
-                    target_pos[i] = DEFAULT_JOINT_ANGLES[i];
+            // Interpolate target positions
+            for(int i = 0; i < 15; ++i){
+                if(i < 12){
+                    tgtPos[i] = initial_positions[i]*(1.0f -alpha) +DEFAULT_JOINT_ANGLES[i]*alpha;
+                }else{
+                    tgtPos[i] = DEFAULT_JOINT_ANGLES[i];
                 }
             }
             
             // Apply ankle solver transformation if enabled
-            applyAnkleSolver(target_pos, ankle_solver);
+            // (tgtPos is used as float[15] via data())
+            float target_pos_arr[15];
+            for(int i = 0; i < 15; ++i) target_pos_arr[i] = tgtPos[i];
+            applyAnkleSolver(target_pos_arr, ankle_solver);
+            for(int i = 0; i < 15; ++i) tgtPos[i] = target_pos_arr[i];
             
-            // Compute torques for each joint (12 legs + 3 waist)
-            std::vector<float> torques(15, 0.0f);
+            // Send PVT command: driver does kp*(pos-actual) + kd*(0-vel) + 0
+            robot->writePVT(tgtPos, tgtVel, tgtTor, tgtKp, tgtKd);
             
-            // Leg motors (0-11)
-            for (int i = 0; i < 12; ++i) {
-                // PD control using transformed target position
-                float torque = pdControl(target_pos[i], joint_pos[i], 0.0f, joint_vel[i], PD_KP[i], PD_KD[i]);
-                
-                // Clip torque
-                if (torque > MAX_TORQUE_LIMIT[i]) torque = MAX_TORQUE_LIMIT[i];
-                if (torque < -MAX_TORQUE_LIMIT[i]) torque = -MAX_TORQUE_LIMIT[i];
-                
-                torques[i] = torque;
-            }
-            
-            // Waist motors (12-14) - keep at default position
-            for (int i = 12; i < 15; ++i) {
-                float target = DEFAULT_JOINT_ANGLES[i];
-                float actual = joint_pos[i];  // Use actual waist motor position
-                float actual_vel = joint_vel[i];
-                float torque = pdControl(target, actual, 0.0f, actual_vel, PD_KP[i], PD_KD[i]);
-                
-                // Clip torque
-                if (torque > MAX_TORQUE_LIMIT[i]) torque = MAX_TORQUE_LIMIT[i];
-                if (torque < -MAX_TORQUE_LIMIT[i]) torque = -MAX_TORQUE_LIMIT[i];
-                
-                torques[i] = torque;
-            }
-            
-            // Store torques for logging (only first 12 for legs)
-            for (int i = 0; i < 12; ++i) {
-                current_torques[i] = torques[i];
-            }
-            
-            // Send torques (including waist motors)
-            robot->writeTorque(torques);
-            
-            if (stage2_ticks % 500 == 0) {
+            if(stage2_ticks % 500 == 0){
                 std::cout << "Moving to default... (" << stage2_ticks 
                           << "/" << (interpolation_ticks + hold_ticks) << ")" << std::endl;
             }
             
             stage2_ticks++;
             usleep(1000);  // 1ms
-
-
         }
         
         std::cout << "Default position reached and stabilized!" << std::endl;
-    } else {
+    }else{
         std::cout << "\nSimulator mode: Skipping default position initialization" << std::endl;
     }
 
@@ -766,9 +739,16 @@ int main(int argc, char** argv) {
     const int POLICY_PERIOD_US = 20000;  // 20ms in microseconds
     auto last_policy_update = std::chrono::steady_clock::now();
     
-    // PD control update timing (200 Hz = 5ms)
+    // PD control update timing — only used for sim/CST mode (200 Hz = 5ms)
     const int PD_UPDATE_PERIOD_MS = 5;  // 5ms = 5 iterations at 1kHz
     int pd_update_counter = 0;
+    
+    // PVT mode vectors (reusable, 15 motors)
+    std::vector<float> pvtPos(15, 0.0f);
+    std::vector<float> pvtVel(15, 0.0f);
+    std::vector<float> pvtTor(15, 0.0f);
+    std::vector<float> pvtKp(PD_KP, PD_KP +15);
+    std::vector<float> pvtKd(PD_KD, PD_KD +15);
     
     while (!g_stop) {
         auto cycle_start = std::chrono::steady_clock::now();
@@ -861,77 +841,98 @@ int main(int argc, char** argv) {
             policy_count++;
         }
         
-        // Recalculate PD control every 5ms (200 Hz)
-        if (pd_update_counter == 0) {
-            // Convert actions to joint targets and compute PD torque commands
-            // Action is relative to default pose, scaled by ACTION_SCALE
-            float target_pos[15] = {0.0f};
-            for (int i = 0; i < 15; ++i) {
-                target_pos[i] = DEFAULT_JOINT_ANGLES[i];
-                if (i < 12) {
-                    target_pos[i] = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE[i];
+        // --- PVT mode (real robot): send targets directly to driver ---
+        if(mode == "real" || mode == "robot"){
+            // Compute target positions from actions (updated at 50Hz, held between updates)
+            for(int i = 0; i < 15; ++i){
+                pvtPos[i] = DEFAULT_JOINT_ANGLES[i];
+                if(i < 12){
+                    pvtPos[i] = DEFAULT_JOINT_ANGLES[i] +actions[i]*ACTION_SCALE[i];
                 }
             }
-
+            
             // Apply ankle solver transformation if enabled
-            applyAnkleSolver(target_pos, ankle_solver);
+            float target_pos_arr[15];
+            for(int i = 0; i < 15; ++i) target_pos_arr[i] = pvtPos[i];
+            applyAnkleSolver(target_pos_arr, ankle_solver);
+            for(int i = 0; i < 15; ++i) pvtPos[i] = target_pos_arr[i];
+            
+            // Store zeros for torque logging (driver computes actual torques internally)
+            for(int i = 0; i < 12; ++i){
+                current_torques[i] = 0.0f;
+            }
+            
+            // Send PVT command every cycle — driver does PD internally:
+            // torque = kp*(pos-actPos) + kd*(vel-actVel) + tor
+            robot->writePVT(pvtPos, pvtVel, pvtTor, pvtKp, pvtKd);
+        }else{
+            // --- Sim mode (CST): retain original local PD torque control ---
+            // Recalculate PD control every 5ms (200 Hz)
+            if(pd_update_counter == 0){
+                // Convert actions to joint targets and compute PD torque commands
+                float target_pos[15] = {0.0f};
+                for(int i = 0; i < 15; ++i){
+                    target_pos[i] = DEFAULT_JOINT_ANGLES[i];
+                    if(i < 12){
+                        target_pos[i] = DEFAULT_JOINT_ANGLES[i] +actions[i]*ACTION_SCALE[i];
+                    }
+                }
 
-            // Prepare torque commands for 12 leg joints + 3 waist motors
-            std::vector<float> torques(15, 0.0f);
-            
-            // Leg motors (0-11)
-            for (int i = 0; i < 12; ++i) {
-                float actual_pos = joint_pos[i];
-                float target_vel = 0.0f;
-                float actual_vel = joint_vel[i];
+                // Apply ankle solver transformation if enabled
+                applyAnkleSolver(target_pos, ankle_solver);
+
+                // Prepare torque commands for 12 leg joints + 3 waist motors
+                std::vector<float> torques(15, 0.0f);
                 
-                // Compute PD torque command
-                float torqueCmd = pdControl(target_pos[i], actual_pos, target_vel, actual_vel, PD_KP[i], PD_KD[i]);
-                
-                // Safety clip: limit torque command to prevent excessive values
-                if (torqueCmd > MAX_TORQUE_LIMIT[i]) {
-                    torqueCmd = MAX_TORQUE_LIMIT[i];
-                    std::cerr << "WARNING: Torque clipped for motor " << i 
-                              << " (clipped to: " << torqueCmd << " N·m)" << std::endl;
-                } else if (torqueCmd < -MAX_TORQUE_LIMIT[i]) {
-                    torqueCmd = -MAX_TORQUE_LIMIT[i];
-                    std::cerr << "WARNING: Torque clipped for motor " << i 
-                              << " (clipped to: " << torqueCmd << " N·m)" << std::endl;
+                // Leg motors (0-11)
+                for(int i = 0; i < 12; ++i){
+                    float actual_pos = joint_pos[i];
+                    float target_vel = 0.0f;
+                    float actual_vel = joint_vel[i];
+                    
+                    // Compute PD torque command
+                    float torqueCmd = pdControl(target_pos[i], actual_pos, target_vel, actual_vel, PD_KP[i], PD_KD[i]);
+                    
+                    // Safety clip
+                    if(torqueCmd > MAX_TORQUE_LIMIT[i]){
+                        torqueCmd = MAX_TORQUE_LIMIT[i];
+                    }else if(torqueCmd < -MAX_TORQUE_LIMIT[i]){
+                        torqueCmd = -MAX_TORQUE_LIMIT[i];
+                    }
+                    
+                    torques[i] = torqueCmd;
                 }
                 
-                torques[i] = torqueCmd;
-            }
-            
-            // Waist motors (12-14) - keep at default position
-            for (int i = 12; i < 15; ++i) {
-                float target = DEFAULT_JOINT_ANGLES[i];
-                float actual = joint_pos[i];  // Use actual waist motor position
-                float actual_vel = joint_vel[i];
-                float torqueCmd = pdControl(target, actual, 0.0f, actual_vel, PD_KP[i], PD_KD[i]);
-                
-                // Clip torque
-                if (torqueCmd > MAX_TORQUE_LIMIT[i]) {
-                    torqueCmd = MAX_TORQUE_LIMIT[i];
-                } else if (torqueCmd < -MAX_TORQUE_LIMIT[i]) {
-                    torqueCmd = -MAX_TORQUE_LIMIT[i];
+                // Waist motors (12-14)
+                for(int i = 12; i < 15; ++i){
+                    float target = DEFAULT_JOINT_ANGLES[i];
+                    float actual = joint_pos[i];
+                    float actual_vel = joint_vel[i];
+                    float torqueCmd = pdControl(target, actual, 0.0f, actual_vel, PD_KP[i], PD_KD[i]);
+                    
+                    if(torqueCmd > MAX_TORQUE_LIMIT[i]){
+                        torqueCmd = MAX_TORQUE_LIMIT[i];
+                    }else if(torqueCmd < -MAX_TORQUE_LIMIT[i]){
+                        torqueCmd = -MAX_TORQUE_LIMIT[i];
+                    }
+                    
+                    torques[i] = torqueCmd;
                 }
                 
-                torques[i] = torqueCmd;
+                // Store torques for logging
+                for(int i = 0; i < 12; ++i){
+                    current_torques[i] = torques[i];
+                }
+                
+                // Send torques to robot
+                robot->writeTorque(torques);
             }
             
-            // Store torques for logging (only first 12 for legs)
-            for (int i = 0; i < 12; ++i) {
-                current_torques[i] = torques[i];
+            // Update counter for PD control recalculation (every 5ms)
+            pd_update_counter++;
+            if(pd_update_counter >= PD_UPDATE_PERIOD_MS){
+                pd_update_counter = 0;
             }
-            
-            // Send torques to robot (including waist motors)
-            robot->writeTorque(torques);
-        }
-        
-        // Update counter for PD control recalculation (every 5ms)
-        pd_update_counter++;
-        if (pd_update_counter >= PD_UPDATE_PERIOD_MS) {
-            pd_update_counter = 0;
         }
         
         // Timing and statistics

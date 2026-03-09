@@ -97,9 +97,6 @@ void printUsage(const char* argv0) {
         << "\n"
         << "Test Modes:\n"
         << "  --mode         CiA-402 mode (default: 5 PVT)\n"
-        << "  --kp           PVT Proportional Gain (default: 0.0)\n"
-        << "  --kd           PVT Derivative Gain (default: 0.0)\n"
-        << "  --tor          PVT Feedforward Torque (default: 0.0)\n"
         << "  --period-us    Loop period in microseconds (default: 1000)\n"
         << "  --seconds      Run time after reaching OP (default: 10, <0 means forever)\n"
         << "  --enable       Actually enable drives (default: disabled/monitor-only)\n"
@@ -166,6 +163,11 @@ int clampInt(int v, int lo, int hi) {
 struct AliasPosCmd {
     int alias = 0;
     float pos = 0.0f;
+};
+
+struct AliasValueCmd {
+    int alias = 0;
+    float value = 0.0f;
 };
 
 struct AliasPosRangeCmd {
@@ -330,6 +332,38 @@ bool parseAliasPosCmds(const std::string& spec, bool defaultDeg, std::vector<Ali
     return true;
 }
 
+bool parseAliasValueCmds(const std::string& spec, std::vector<AliasValueCmd>& out, std::string& err) {
+    out.clear();
+    err.clear();
+    size_t start = 0;
+    while (start < spec.size()) {
+        size_t end = spec.find(',', start);
+        std::string token = (end == std::string::npos) ? spec.substr(start) : spec.substr(start, end - start);
+        if (!token.empty()) {
+            const size_t sep = token.find(':');
+            if (sep == std::string::npos) {
+                err = "Expected alias:value, got: " + token;
+                return false;
+            }
+            const std::string aStr = token.substr(0, sep);
+            const std::string vStr = token.substr(sep + 1);
+            if (aStr.empty() || vStr.empty()) {
+                err = "Invalid alias:value, got: " + token;
+                return false;
+            }
+            AliasValueCmd cmd;
+            cmd.alias = std::stoi(aStr);
+            cmd.value = std::stof(vStr);
+            out.push_back(cmd);
+        }
+        if (end == std::string::npos) {
+            break;
+        }
+        start = end + 1;
+    }
+    return true;
+}
+
 bool parseAliasPosRangeCmds(const std::string& spec, bool defaultDeg, std::vector<AliasPosRangeCmd>& out, std::string& err) {
     out.clear();
     err.clear();
@@ -395,14 +429,17 @@ struct RecipState {
 };
 
 void fillHoldTargets(const std::vector<DriverSDK::motorActualStruct>& actuals,
-                     std::vector<DriverSDK::motorTargetStruct>& targets) {
+                     std::vector<DriverSDK::motorTargetStruct>& targets,
+                     const std::vector<float>& motorKp,
+                     const std::vector<float>& motorKd,
+                     const std::vector<float>& motorTor) {
     const int motorCount = static_cast<int>(targets.size());
     for (int i = 0; i < motorCount; ++i) {
         targets[i].pos = actuals[i].pos;
         targets[i].vel = 0.0f;
-        targets[i].tor = g_defaultTor;
-        targets[i].kp = g_defaultKp;
-        targets[i].kd = g_defaultKd;
+        targets[i].tor = motorTor[i];
+        targets[i].kp = motorKp[i];
+        targets[i].kd = motorKd[i];
         targets[i].enabled = 0;
     }
 }
@@ -465,9 +502,12 @@ void disableAllAndExit(DriverSDK::DriverSDK& sdk,
                       const std::vector<int>& motorIdx,
                       int periodUs,
                       std::vector<DriverSDK::motorActualStruct>& actuals,
-                      std::vector<DriverSDK::motorTargetStruct>& targets) {
+                      std::vector<DriverSDK::motorTargetStruct>& targets,
+                      const std::vector<float>& motorKp,
+                      const std::vector<float>& motorKd,
+                      const std::vector<float>& motorTor) {
     sdk.getMotorActual(actuals);
-    fillHoldTargets(actuals, targets);
+    fillHoldTargets(actuals, targets, motorKp, motorKd, motorTor);
     for (int idx : motorIdx) {
         targets[idx].enabled = 0;
     }
@@ -657,18 +697,6 @@ int main(int argc, char** argv) {
         }
         if (arg == "--max-current" && i + 1 < argc) {
             maxCurrentU16 = std::stoi(argv[++i]);
-            continue;
-        }
-        if (arg == "--kp" && i + 1 < argc) {
-            g_defaultKp = std::stof(argv[++i]);
-            continue;
-        }
-        if (arg == "--kd" && i + 1 < argc) {
-            g_defaultKd = std::stof(argv[++i]);
-            continue;
-        }
-        if (arg == "--tor" && i + 1 < argc) {
-            g_defaultTor = std::stof(argv[++i]);
             continue;
         }
         if (!arg.empty() && arg[0] != '-') {
@@ -902,6 +930,83 @@ int main(int argc, char** argv) {
         }
     }
 
+    // ------------------------------------------------------------------------
+    // PER-MOTOR PVT PARAMETERS
+    // You can set the Kp, Kd, and Torque parameters for each motor here.
+    // The index in these arrays matches the output of (Alias - 1).
+    // For example, the first element is for Alias 1, the second for Alias 2, etc.
+    // If you don't want to use these hardcoded arrays, you can fall back to g_defaultKp.
+    // ------------------------------------------------------------------------
+    const float kp_array[] = {
+        0.0f,  // Alias 1
+        0.0f,  // Alias 2
+        0.0f,  // Alias 3
+        0.0f,  // Alias 4
+        0.0f,  // Alias 5
+        0.0f,  // Alias 6
+        0.0f,  // Alias 7
+        0.0f,  // Alias 8
+        0.0f,  // Alias 9
+        0.0f,  // Alias 10
+        0.0f,  // Alias 11
+        0.0f,  // Alias 12
+        0.0f,  // Alias 13
+        0.0f,  // Alias 14
+        0.0f   // Alias 15
+    };
+    
+    const float kd_array[] = {
+        0.0f,  // Alias 1
+        0.0f,  // Alias 2
+        0.0f,  // Alias 3
+        0.0f,  // Alias 4
+        0.0f,  // Alias 5
+        0.0f,  // Alias 6
+        0.0f,  // Alias 7
+        0.0f,  // Alias 8
+        0.0f,  // Alias 9
+        0.0f,  // Alias 10
+        0.0f,  // Alias 11
+        0.0f,  // Alias 12
+        0.0f,  // Alias 13
+        0.0f,  // Alias 14
+        0.0f   // Alias 15
+    };
+    
+    const float tor_array[] = {
+        0.0f,  // Alias 1
+        0.0f,  // Alias 2
+        0.0f,  // Alias 3
+        0.0f,  // Alias 4
+        0.0f,  // Alias 5
+        0.0f,  // Alias 6
+        0.0f,  // Alias 7
+        0.0f,  // Alias 8
+        0.0f,  // Alias 9
+        0.0f,  // Alias 10
+        0.0f,  // Alias 11
+        0.0f,  // Alias 12
+        0.0f,  // Alias 13
+        0.0f,  // Alias 14
+        0.0f   // Alias 15
+    };
+
+    std::vector<float> motorKp(motorCount, g_defaultKp);
+    std::vector<float> motorKd(motorCount, g_defaultKd);
+    std::vector<float> motorTor(motorCount, g_defaultTor);
+
+    for (int i = 0; i < motorCount; ++i) {
+        if (i < static_cast<int>(sizeof(kp_array) / sizeof(kp_array[0]))) {
+            motorKp[i] = kp_array[i];
+        }
+        if (i < static_cast<int>(sizeof(kd_array) / sizeof(kd_array[0]))) {
+            motorKd[i] = kd_array[i];
+        }
+        if (i < static_cast<int>(sizeof(tor_array) / sizeof(tor_array[0]))) {
+            motorTor[i] = tor_array[i];
+        }
+    }
+
     std::sort(selectedAlias.begin(), selectedAlias.end());
     selectedAlias.erase(std::unique(selectedAlias.begin(), selectedAlias.end()), selectedAlias.end());
 
@@ -1063,7 +1168,7 @@ int main(int argc, char** argv) {
     int waitTick = 0;
     while (!g_stop) {
         sdk.getMotorActual(actuals);
-        fillHoldTargets(actuals, targets);
+        fillHoldTargets(actuals, targets, motorKp, motorKd, motorTor);
         for (int idx : motorIdx) {
             targets[idx].enabled = 1;
         }
@@ -1090,7 +1195,7 @@ int main(int argc, char** argv) {
     }
 
     if (g_stop) {
-        disableAllAndExit(sdk, motorIdx, periodUs, actuals, targets);
+        disableAllAndExit(sdk, motorIdx, periodUs, actuals, targets, motorKp, motorKd, motorTor);
         return 0;
     }
 
@@ -1101,7 +1206,7 @@ int main(int argc, char** argv) {
         bool allOp = false;
         while (!g_stop) {
             sdk.getMotorActual(actuals);
-            fillHoldTargets(actuals, targets);
+            fillHoldTargets(actuals, targets, motorKp, motorKd, motorTor);
             for (int idx : motorIdx) {
                 targets[idx].enabled = 1;
             }
@@ -1147,7 +1252,7 @@ int main(int argc, char** argv) {
         }
 
         if (calibrateOnly) {
-            disableAllAndExit(sdk, motorIdx, periodUs, actuals, targets);
+            disableAllAndExit(sdk, motorIdx, periodUs, actuals, targets, motorKp, motorKd, motorTor);
             return 0;
         }
     }
@@ -1167,7 +1272,7 @@ int main(int argc, char** argv) {
         const int settleTicks = std::max(1, (settleMs * 1000 + periodUs - 1) / periodUs);
         for (int s = 0; s < settleTicks && !g_stop; ++s) {
             sdk.getMotorActual(actuals);
-            fillHoldTargets(actuals, targets);
+            fillHoldTargets(actuals, targets, motorKp, motorKd, motorTor);
             for (int idx : motorIdx) {
                 targets[idx].enabled = 1;
             }
@@ -1204,7 +1309,7 @@ int main(int argc, char** argv) {
 
             for (int seqTick = 0; seqTick < sequentialDelayMs && !g_stop; ++seqTick) {
                 sdk.getMotorActual(actuals);
-                fillHoldTargets(actuals, targets);
+                fillHoldTargets(actuals, targets, motorKp, motorKd, motorTor);
                 for (int idx : motorIdx) {
                     targets[idx].enabled = 1;
                 }
@@ -1222,7 +1327,7 @@ int main(int argc, char** argv) {
                 if (enableImu) {
                     sdk.getIMU(imu);
                 }
-                fillHoldTargets(actuals, targets);
+                fillHoldTargets(actuals, targets, motorKp, motorKd, motorTor);
 
                 for (int j = 0; j < static_cast<int>(motorIdx.size()); ++j) {
                     const int idx = motorIdx[j];
@@ -1297,7 +1402,7 @@ int main(int argc, char** argv) {
             if (enableImu) {
                 sdk.getIMU(imu);
             }
-            fillHoldTargets(actuals, targets);
+            fillHoldTargets(actuals, targets, motorKp, motorKd, motorTor);
 
             for (int j = 0; j < static_cast<int>(motorIdx.size()); ++j) {
                 const int idx = motorIdx[j];
@@ -1358,7 +1463,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    disableAllAndExit(sdk, motorIdx, periodUs, actuals, targets);
+    disableAllAndExit(sdk, motorIdx, periodUs, actuals, targets, motorKp, motorKd, motorTor);
     return 0;
 }
 

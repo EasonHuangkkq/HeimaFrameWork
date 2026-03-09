@@ -11,11 +11,12 @@
 
 class RealRobotInterface : public RobotInterface {
 public:
+    // opMode: 5=PVT, 8=CSP, 10=CST
     RealRobotInterface(const std::string& config_file = "config.xml",
                        const std::vector<unsigned short>& maxCurrent = {},
                        int ecatCpu = -1,
-                       bool useCSP = false)
-        : config_file_(config_file), max_current_(maxCurrent), ecat_cpu_(ecatCpu), use_csp_(useCSP) {}
+                       int opMode = 10)
+        : config_file_(config_file), max_current_(maxCurrent), ecat_cpu_(ecatCpu), opMode_(opMode) {}
     
     bool init() override;
     
@@ -29,6 +30,12 @@ public:
     
     bool writePosition(const std::vector<float>& positions) override;
     
+    bool writePVT(const std::vector<float>& pos,
+                  const std::vector<float>& vel,
+                  const std::vector<float>& tor,
+                  const std::vector<float>& kp,
+                  const std::vector<float>& kd) override;
+    
     void shutdown() override;
     
     int getMotorCount() const override;
@@ -37,7 +44,7 @@ private:
     std::string config_file_;
     std::vector<unsigned short> max_current_;
     int ecat_cpu_ = -1;
-    bool use_csp_ = false;
+    int opMode_ = 10;  // 5=PVT, 8=CSP, 10=CST
     DriverSDK::DriverSDK* sdk_ = nullptr;
     int motor_count_ = 0;
     std::vector<DriverSDK::motorActualStruct> motor_states_;

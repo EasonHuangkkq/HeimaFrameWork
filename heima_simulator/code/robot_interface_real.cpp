@@ -37,18 +37,20 @@ bool RealRobotInterface::init() {
     motor_states_.resize(motor_count_);
     motor_commands_.resize(motor_count_);
     
-    // Set operating mode: CSP (8) for position control, CST (10) for torque control
-    char opMode = use_csp_ ? 8 : 10;
-    std::vector<char> modes(motor_count_, opMode);
+    // Set operating mode: 5=PVT, 8=CSP, 10=CST
+    std::vector<char> modes(motor_count_, static_cast<char>(opMode_));
     sdk_->setMode(modes);
-    std::cout << "Operating mode: " << (use_csp_ ? "CSP (position)" : "CST (torque)") << std::endl;
+    const char* modeName = (opMode_ == 5) ? "PVT" : (opMode_ == 8) ? "CSP" : "CST";
+    std::cout << "Operating mode: " << modeName << " (" << opMode_ << ")" << std::endl;
     
-    // Enable all motors
-    for (int i = 0; i < motor_count_; ++i) {
+    // Enable all motors (PVT: use kp=0,kd=0 during OP wait for safe approach)
+    for(int i = 0; i < motor_count_; ++i){
         motor_commands_[i].enabled = 1;
         motor_commands_[i].pos = 0.0f;
         motor_commands_[i].vel = 0.0f;
         motor_commands_[i].tor = 0.0f;
+        motor_commands_[i].kp = 0.0f;
+        motor_commands_[i].kd = 0.0f;
     }
     
     // Wait for motors to reach operational state
@@ -57,19 +59,30 @@ bool RealRobotInterface::init() {
     int wait_ticks = 0;
     bool all_operational = false;
     
-    while (!all_operational && wait_ticks < max_wait_ticks) {
-        sdk_->setMotorTarget(motor_commands_);
+    while(!all_operational && wait_ticks < max_wait_ticks){
+        // Read actual states first
         sdk_->getMotorActual(motor_states_);
         
+        // Set target position to actual position (match fillHoldTargets pattern)
+        for(int i = 0; i < motor_count_; ++i){
+            motor_commands_[i].pos = motor_states_[i].pos;
+            motor_commands_[i].vel = 0.0f;
+            motor_commands_[i].tor = 0.0f;
+            motor_commands_[i].kp = 0.0f;
+            motor_commands_[i].kd = 0.0f;
+            motor_commands_[i].enabled = 1;
+        }
+        sdk_->setMotorTarget(motor_commands_);
+        
         all_operational = true;
-        for (int i = 0; i < 15 && i < motor_count_; ++i) {
-            if ((motor_states_[i].statusWord & 0x007f) != 0x0037) {
+        for(int i = 0; i < 15 && i < motor_count_; ++i){
+            if((motor_states_[i].statusWord & 0x007f) != 0x0037){
                 all_operational = false;
                 break;
             }
         }
         
-        if (wait_ticks % 500 == 0) {
+        if(wait_ticks % 500 == 0){
             std::cout << "Waiting... (" << wait_ticks << "/" << max_wait_ticks << ")" << std::endl;
         }
         
@@ -77,9 +90,9 @@ bool RealRobotInterface::init() {
         usleep(1000);  // 1ms
     }
     
-    if (!all_operational) {
+    if(!all_operational){
         std::cerr << "Warning: Not all motors reached operational state" << std::endl;
-    } else {
+    }else{
         std::cout << "All motors operational!" << std::endl;
     }
     
@@ -157,6 +170,33 @@ bool RealRobotInterface::writeTorque(const std::vector<float>& torques) {
     return true;
 }
 
+bool RealRobotInterface::writePVT(const std::vector<float>& pos,
+                                  const std::vector<float>& vel,
+                                  const std::vector<float>& tor,
+                                  const std::vector<float>& kp,
+                                  const std::vector<float>& kd){
+    int n = std::min({static_cast<int>(pos.size()),
+                     static_cast<int>(vel.size()),
+                     static_cast<int>(tor.size()),
+                     static_cast<int>(kp.size()),
+                     static_cast<int>(kd.size()),
+                     motor_count_});
+    if(n < 12){
+        std::cerr << "Error: Expected at least 12 PVT targets, got " << n << std::endl;
+        return false;
+    }
+    for(int i = 0; i < n; ++i){
+        motor_commands_[i].pos = pos[i];
+        motor_commands_[i].vel = vel[i];
+        motor_commands_[i].tor = tor[i];
+        motor_commands_[i].kp  = kp[i];
+        motor_commands_[i].kd  = kd[i];
+        motor_commands_[i].enabled = 1;
+    }
+    sdk_->setMotorTarget(motor_commands_);
+    return true;
+}
+
 bool RealRobotInterface::writePosition(const std::vector<float>& positions){
     if(positions.size() < 12){
         std::cerr << "Error: Expected at least 12 positions, got " << positions.size() << std::endl;
@@ -175,18 +215,23 @@ bool RealRobotInterface::writePosition(const std::vector<float>& positions){
     return true;
 }
 
-void RealRobotInterface::shutdown() {
+void RealRobotInterface::shutdown(){
     std::cout << "Shutting down real robot interface..." << std::endl;
     
-    // Disable all motors
-    for (int i = 0; i < motor_count_; ++i) {
+    // Read current positions before disabling
+    sdk_->getMotorActual(motor_states_);
+    
+    // Disable all motors (zero kp/kd/tor for PVT safety, hold current position)
+    for(int i = 0; i < motor_count_; ++i){
         motor_commands_[i].enabled = 0;
         motor_commands_[i].pos = motor_states_[i].pos;  // Hold current position
         motor_commands_[i].vel = 0.0f;
         motor_commands_[i].tor = 0.0f;
+        motor_commands_[i].kp = 0.0f;
+        motor_commands_[i].kd = 0.0f;
     }
     
-    for (int i = 0; i < 100; ++i) {
+    for(int i = 0; i < 100; ++i){
         sdk_->setMotorTarget(motor_commands_);
         usleep(1000);
     }

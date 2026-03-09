@@ -21,8 +21,8 @@ if(BUILD_REAL_ROBOT)
     message(STATUS "=== Building with REAL ROBOT support ===")
     
     # Check if DriverSDK source exists
-    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/../../heimaSDK_copy")
-        message(FATAL_ERROR "DriverSDK source not found at ../../heimaSDK_copy/. Cannot build real robot mode.")
+    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/../../heimaSDK")
+        message(FATAL_ERROR "DriverSDK source not found at ../../heimaSDK/. Cannot build real robot mode.")
     endif()
     
     # Find EtherCAT library (required for real robot)
@@ -39,7 +39,7 @@ if(BUILD_REAL_ROBOT)
     endif()
     
     # Add DriverSDK paths
-    include_directories(${PROJECT_SOURCE_DIR}/../../heimaSDK_copy)
+    include_directories(${PROJECT_SOURCE_DIR}/../../heimaSDK)
     add_definitions(-DBUILD_REAL_ROBOT)
     
     message(STATUS "DriverSDK will be built from source")
@@ -171,17 +171,17 @@ if(BUILD_REAL_ROBOT)
     message(STATUS "Building DriverSDK from source...")
     
     add_library(driver_sdk SHARED
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/common.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/config_xml.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/tinyxml2.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/heima_driver_sdk.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/rs232.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/rs485.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/can.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/ecat.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/yesense_imu.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/yesense/src/yesense_decoder.cpp
-        ${PROJECT_SOURCE_DIR}/../../heimaSDK_copy/yesense/src/yesense_std_out_decoder.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/common.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/config_xml.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/tinyxml2.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/heima_driver_sdk.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/rs232.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/rs485.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/can.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/ecat.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/yesense_imu.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/yesense/src/yesense_decoder.cpp
+        ${PROJECT_SOURCE_DIR}/../../heimaSDK/yesense/src/yesense_std_out_decoder.cpp
     )
     
     target_link_libraries(driver_sdk PUBLIC

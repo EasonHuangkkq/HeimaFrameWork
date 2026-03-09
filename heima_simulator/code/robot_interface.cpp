@@ -17,7 +17,7 @@ std::unique_ptr<RobotInterface> createRobotInterface(
     const std::string& config,
     const std::vector<unsigned short>& maxCurrent,
     int ecatCpu,
-    bool useCSP)
+    int opMode)
 {
 #ifndef BUILD_REAL_ROBOT
     if (mode == "sim" || mode == "simulator") {
@@ -45,7 +45,7 @@ std::unique_ptr<RobotInterface> createRobotInterface(
     else if (mode == "real" || mode == "robot") {
         std::cout << "Creating real robot interface (SDK)" << std::endl;
         std::string config_file = config.empty() ? "config.xml" : config;
-        return std::make_unique<RealRobotInterface>(config_file, maxCurrent, ecatCpu, useCSP);
+        return std::make_unique<RealRobotInterface>(config_file, maxCurrent, ecatCpu, opMode);
     }
     else {
         std::cerr << "Unknown mode: " << mode << ". Use 'sim' or 'real'" << std::endl;
