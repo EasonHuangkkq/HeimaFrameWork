@@ -142,10 +142,10 @@ void applyAnkleSolver(float* target_pos, AnkleSolver& solver){
 
 void applyAnkleSolverInverse(std::vector<float>& joint_pos, AnkleSolver& solver){
     if(!USE_ANKLE_SOLVER) return;
-    auto [l_virt_p, l_virt_r] = solver.inverse(joint_pos[4], joint_pos[5]);
+    auto [l_virt_p, l_virt_r] = solver.solve_inverse(joint_pos[4], joint_pos[5]);
     joint_pos[4] = static_cast<float>(l_virt_p);
     joint_pos[5] = static_cast<float>(l_virt_r);
-    auto [r_virt_p, r_virt_r] = solver.inverse(joint_pos[10], joint_pos[11]);
+    auto [r_virt_p, r_virt_r] = solver.solve_inverse(joint_pos[10], joint_pos[11]);
     joint_pos[10] = static_cast<float>(r_virt_p);
     joint_pos[11] = static_cast<float>(r_virt_r);
 }

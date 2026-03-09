@@ -109,6 +109,26 @@ target_link_libraries(whole_body_smoke_test PUBLIC
     m
 )
 
+# Whole body PVT test executable
+add_executable(whole_body_pvt_test
+    whole_body_pvt_test.cpp
+    heima_driver_sdk.cpp
+    ecat.cpp
+    rs485.cpp
+    can.cpp
+    rs232.cpp
+    yesense_imu.cpp
+    yesense/src/yesense_decoder.cpp
+    yesense/src/yesense_std_out_decoder.cpp
+)
+target_compile_definitions(whole_body_pvt_test PRIVATE ENABLE_RS232)
+target_link_libraries(whole_body_pvt_test PUBLIC
+    driver_sdk
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
+
 # Python/ctypes-friendly shared library (C ABI)
 add_library(heima_sdk_c SHARED
     heima_sdk_c_api.cpp

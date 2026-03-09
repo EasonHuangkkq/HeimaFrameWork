@@ -5,6 +5,7 @@
 #include "robot_interface_real.h"
 #include <iostream>
 #include <unistd.h>
+#include <algorithm>
 
 bool RealRobotInterface::init() {
     std::cout << "Initializing real robot SDK..." << std::endl;

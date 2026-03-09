@@ -124,7 +124,7 @@ void updateCommandsFromKeyboard() {
 }
 
 // Ankle solver configuration
-const bool USE_ANKLE_SOLVER = false;  // Set to true to enable ankle kinematics correction
+bool USE_ANKLE_SOLVER = true;  // Set to true to enable ankle kinematics correction
 
 // Apply ankle solver to transform desired ankle pitch/roll into actual motor angles
 void applyAnkleSolver(float target_pos[15], AnkleSolver& ankle_solver) {
@@ -345,6 +345,12 @@ bool loadConfigFromYAML(const std::string& config_path) {
             std::cout << "[Config] Thread: ecat_cpu=" << ThreadEcatCpu
                       << ", control_cpu=" << ThreadControlCpu
                       << ", priority=" << ThreadControlPri << std::endl;
+        }
+
+        // Load ankle solver config
+        if(config["use_ankle_solver"]){
+            USE_ANKLE_SOLVER = config["use_ankle_solver"].as<bool>();
+            std::cout << "[Config] Loaded USE_ANKLE_SOLVER = " << (USE_ANKLE_SOLVER ? "true" : "false") << std::endl;
         }
         
         return true;
@@ -744,12 +750,27 @@ int main(int argc, char** argv) {
     int pd_update_counter = 0;
     
     // PVT mode vectors (reusable, 15 motors)
-    std::vector<float> pvtPos(15, 0.0f);
+    std::vector<float> pvtPosTarget(15, 0.0f);   // Step target from 50Hz RL action
+    std::vector<float> pvtPosPrevious(15, 0.0f); // Previous target for interpolation
+    std::vector<float> pvtPosInterpolated(15, 0.0f); // Smoothed target applied to hardware
     std::vector<float> pvtVel(15, 0.0f);
     std::vector<float> pvtTor(15, 0.0f);
     std::vector<float> pvtKp(PD_KP, PD_KP +15);
     std::vector<float> pvtKd(PD_KD, PD_KD +15);
     
+    // Fetch state once to prime the filters and targets
+    if (!robot->fetchObs(rpy, base_ang_vel, joint_pos, joint_vel)) {
+        std::cerr << "Failed to fetch initial observations" << std::endl;
+        return 1;
+    }
+    
+    // Initialize interpolated and previous POS to current actual joint state to avoid immediate jump
+    for(int i = 0; i < 15; ++i) {
+        pvtPosInterpolated[i] = joint_pos[i];
+        pvtPosPrevious[i] = joint_pos[i];
+        pvtPosTarget[i] = joint_pos[i];
+    }
+
     while (!g_stop) {
         auto cycle_start = std::chrono::steady_clock::now();
         
@@ -843,19 +864,39 @@ int main(int argc, char** argv) {
         
         // --- PVT mode (real robot): send targets directly to driver ---
         if(mode == "real" || mode == "robot"){
-            // Compute target positions from actions (updated at 50Hz, held between updates)
-            for(int i = 0; i < 15; ++i){
-                pvtPos[i] = DEFAULT_JOINT_ANGLES[i];
-                if(i < 12){
-                    pvtPos[i] = DEFAULT_JOINT_ANGLES[i] +actions[i]*ACTION_SCALE[i];
-                }
-            }
+            // Calculate interpolation factor (0.0 to 1.0)
+            auto time_since_update_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                now - last_policy_update).count();
+            float interpolation_alpha = static_cast<float>(time_since_update_us) / POLICY_PERIOD_US;
+            if (interpolation_alpha > 1.0f) interpolation_alpha = 1.0f;
             
-            // Apply ankle solver transformation if enabled
-            float target_pos_arr[15];
-            for(int i = 0; i < 15; ++i) target_pos_arr[i] = pvtPos[i];
-            applyAnkleSolver(target_pos_arr, ankle_solver);
-            for(int i = 0; i < 15; ++i) pvtPos[i] = target_pos_arr[i];
+            // At the exact moment the policy updates (time_since_policy >= POLICY_PERIOD_US block above),
+            // we compute new pvtPosTarget. We must save the old target to pvtPosPrevious to interpolate.
+            if(time_since_policy >= POLICY_PERIOD_US) {
+                pvtPosPrevious = pvtPosTarget;  // Cycle the targets for the new 20ms window
+                
+                // Compute new target positions from actions (updated at 50Hz)
+                for(int i = 0; i < 15; ++i){
+                    pvtPosTarget[i] = DEFAULT_JOINT_ANGLES[i];
+                    if(i < 12){
+                        pvtPosTarget[i] = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE[i];
+                    }
+                }
+                
+                // Apply ankle solver transformation if enabled
+                float target_pos_arr[15];
+                for(int i = 0; i < 15; ++i) target_pos_arr[i] = pvtPosTarget[i];
+                applyAnkleSolver(target_pos_arr, ankle_solver);
+                for(int i = 0; i < 15; ++i) pvtPosTarget[i] = target_pos_arr[i];
+                
+                // Reset alpha for the very first frame of the new update
+                interpolation_alpha = 0.0f;
+            }
+
+            // Apply Linear Interpolation between previous target and new target
+            for(int i = 0; i < 15; ++i){
+                pvtPosInterpolated[i] = pvtPosPrevious[i] * (1.0f - interpolation_alpha) + pvtPosTarget[i] * interpolation_alpha;
+            }
             
             // Store zeros for torque logging (driver computes actual torques internally)
             for(int i = 0; i < 12; ++i){
@@ -864,7 +905,7 @@ int main(int argc, char** argv) {
             
             // Send PVT command every cycle — driver does PD internally:
             // torque = kp*(pos-actPos) + kd*(vel-actVel) + tor
-            robot->writePVT(pvtPos, pvtVel, pvtTor, pvtKp, pvtKd);
+            robot->writePVT(pvtPosInterpolated, pvtVel, pvtTor, pvtKp, pvtKd);
         }else{
             // --- Sim mode (CST): retain original local PD torque control ---
             // Recalculate PD control every 5ms (200 Hz)

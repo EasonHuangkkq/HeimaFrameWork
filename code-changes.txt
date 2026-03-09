@@ -1,0 +1,17 @@
+1. **使用了真实的关节当前位置来初始化追踪目标 (Initialization Jolt)**
+   之前在刚进入 1kHz 的 `while` 循环时，所有的 `pvtPos[i]` 直接被设为了虚拟模型跑出来的零点 `DEFAULT_JOINT_ANGLES[i]`。但真实机器人的关节因为在 Stage 2 到达目标位置后可能有细微的稳态误差（或者是你手扶着导致它没有绝对停留在零点），这会导致进入循环的第一个 1ms，电机收到一个剧烈的位置突变指令而乱蹬。
+   
+    **我怎么改的**：在进入 `while (!g_stop)` 主循环前，显式调用一次 `robot->fetchObs` 拿到最真实的物理位置 `joint_pos`，并直接把这个位置赋给硬件实际追踪的变量 `pvtPosFiltered`。这样第一帧保证了靶标和当前位置严丝合缝。
+
+2. **修复了踝关节解算器 (Ankle Solver) 没有打开的 Bug**
+   上一步的那个测试脚本 `whole_body_pvt_test.cpp` 或许能跑，但在 `main.cpp` 里对于参数 `USE_ANKLE_SOLVER` 是写死的 `const bool USE_ANKLE_SOLVER = false;`！更可怕的是它连你在 `config.yaml` 里面配的都不认。这意味着，神经网络吐出来的虚拟 Pitch 和 Roll 舵机角度，根本没有经过逆运动学解算（连杆映射），就活生生地直接喂给了底层的物理电机。两根推杆（并联机构）会疯狂互相撕扯对抗，导致起飞或者乱扭。
+   
+   **我怎么改的**：去掉了 `const`，并让程序在 `loadConfigFromYAML` 加载阶段去老老实实读你写在 yaml 里的 `use_ankle_solver` 配置。
+
+3. **增加了 50Hz RL Policy 到 1kHz 底层驱动的 EMA 低通滤波平滑 (Hardware PVT 50Hz Step Kicking)**
+   你的 `policy` 是 50Hz 跑一次（也就是每隔 20ms 才输出一个新的动作 `actions`）。但在真机上（`mode == "real"`），你使用了 PVT 模式，底层硬件 PID 控制的刚度极大（Kp和Kd固定很大）。
+   原来的逻辑：每 20 毫秒目标位置突变一次（阶跃信号），但这中间的 19 毫秒靶标完全不动。对于高频响的硬件驱动器来说，这种 20ms 一次的“阶跃”会造成巨大的 P-Term 力矩尖峰。
+   
+   **我怎么改的**：我新增了 `pvtPosTarget`（50Hz更新的方波信号）和 `pvtPosFiltered`（真正发给底层的信号）。并在每次 1kHz 的通信中加入了指数移动平均 (EMA, Alpha=0.2)：
+   `pvtPosFiltered[i] = pvtPosFiltered[i] * (1.0f - EMA_ALPHA) + pvtPosTarget[i] * EMA_ALPHA;`
+   这意味着每经过约 5 毫秒（5 个循环），真实发送的目标位置就会平滑地逼近 RL 要求的终点。完美滤除了“蹬地”需要的暴力阶跃尖峰，让运动变平滑。
