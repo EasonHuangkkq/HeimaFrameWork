@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwapList 数据竞争与翻转分析</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#080c18;color:#e0e4ef;min-height:100vh;overflow-x:hidden}
+
+.header{text-align:center;padding:12px 16px 4px}
+h1{font-size:1.2rem;font-weight:900;background:linear-gradient(135deg,#6ee7b7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{font-size:.72rem;color:#64748b;margin-top:4px}
+
+.controls{display:flex;gap:8px;justify-content:center;padding:10px 0;flex-wrap:wrap;align-items:center}
+.btn{font-family:inherit;font-size:.75rem;font-weight:700;padding:6px 14px;border-radius:8px;border:none;cursor:pointer;transition:all .2s}
+.btn:hover{transform:translateY(-1px)}
+.btn-go{background:linear-gradient(135deg,#22c55e,#14b8a6);color:#fff;box-shadow:0 0 10px #22c55e50}
+.btn-stop{background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;box-shadow:0 0 10px #ef444450}
+.btn-ghost{background:#1e293b;color:#94a3b8;border:1px solid #334155}
+.spl{font-size:.72rem;color:#94a3b8;display:flex;align-items:center;gap:4px}
+
+.info{max-width:1300px;margin:4px auto;padding:12px;background:#0f172a;border:1px solid #1e293b;border-radius:10px;font-size:.8rem;color:#cbd5e1;line-height:1.6;text-align:center;min-height:60px}
+.info strong{color:#facc15}.info code{color:#2dd4bf;font-family:monospace;background:#0f172a;padding:2px 4px;border-radius:3px}
+.info .red{color:#f87171;font-weight:700}.info .grn{color:#4ade80;font-weight:700}
+
+/* cycle steps */
+.cycle-bar{max-width:1300px;margin:4px auto;display:flex;justify-content:center}
+.cstep{padding:6px 10px;font-size:.7rem;font-weight:600;border:1px solid #1e293b;background:#111827;color:#475569;transition:all .3s}
+.cstep:first-child{border-radius:8px 0 0 8px}.cstep:last-child{border-radius:0 8px 8px 0}
+.cstep.act{background:#1e3a5f;color:#60a5fa;border-color:#3b82f6;box-shadow:0 0 15px #3b82f640;z-index:2;transform:scale(1.05)}
+.cstep.act.red{background:#3b1f1f;color:#fca5a5;border-color:#ef4444;box-shadow:0 0 15px #ef444440}
+.cstep.act.grn{background:#1a2e1a;color:#86efac;border-color:#22c55e;box-shadow:0 0 15px #22c55e40}
+.cstep.act.pur{background:#231a33;color:#d8b4fe;border-color:#a855f7;box-shadow:0 0 15px #a855f740}
+
+/* MAIN SCENE */
+.scene{display:flex;gap:12px;justify-content:center;padding:10px 12px;align-items:stretch;flex-wrap:wrap}
+
+/* Turntable Engine */
+.engine-col{display:flex;flex-direction:column;align-items:center;gap:10px;width:320px;background:#0f172a80;padding:10px;border-radius:12px;border:1px solid #1e293b}
+.engine-hdr{font-size:.85rem;font-weight:900;color:#facc15;text-align:center;border-bottom:1px solid #334155;padding-bottom:5px;width:100%}
+
+.swap-pair{display:flex;gap:15px;width:100%}
+.swap-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.swap-lbl{font-size:.65rem;font-weight:800;padding:4px;border-radius:6px;text-align:center;width:100%}
+.swap-lbl.rx{background:#3b82f615;color:#60a5fa;border:1px solid #3b82f650}
+.swap-lbl.tx{background:#22c55e15;color:#4ade80;border:1px solid #22c55e50}
+
+.tt{position:relative;width:100px;height:100px;margin:10px auto}
+.tt-bg{position:absolute;inset:0;border-radius:50%;border:2px dashed #334155}
+.tt-ring{position:absolute;inset:0;width:100px;height:100px;transition:transform .6s cubic-bezier(.3,0,.1,1.1)}
+.nd{position:absolute;width:34px;height:34px;border-radius:6px;border:2px solid #334155;font-size:.45rem;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2;transition:all .3s}
+.nd-0{left:33px;top:66px} /* bottom */
+.nd-1{left:4.5px;top:16px} /* top-left */
+.nd-2{left:61.5px;top:16px} /* top-right */
+.nd-inner{transition:transform .6s cubic-bezier(.3,0,.1,1.1)}
+
+.nd.cur{border-color:#facc15;background:#facc1515}
+.nd.nxt{border-color:#ef4444;background:#ef444415}
+.nd.prv{border-color:#64748b;background:#64748b15}
+.nd.highlight-tx{box-shadow:0 0 20px #22c55e!important;border-color:#22c55e!important;background:#22c55e30!important;transform:scale(1.1)}
+.nd.highlight-rx{box-shadow:0 0 20px #3b82f6!important;border-color:#3b82f6!important;background:#3b82f630!important;transform:scale(1.1)}
+
+.tt-ptr{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);z-index:10;display:flex;flex-direction:column;align-items:center}
+.tt-ptr .tip{width:16px;height:12px;clip-path:polygon(50% 0%,0% 100%,100% 100%);background:#facc15;animation:bounce 1s infinite alternate}
+.tt-ptr .lbl{font-size:.5rem;font-weight:900;color:#facc15;margin-top:2px}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-4px)}}
+
+/* App Layer Columns */
+.app-col{display:flex;flex-direction:column;gap:10px;width:340px}
+.app-panel{background:#0e121e;border:1px solid #1e293b;border-radius:12px;padding:12px;position:relative;display:flex;flex-direction:column}
+.app-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0}
+.app-panel.bug::before{background:#ef4444}
+.app-panel.fix::before{background:#22c55e}
+.app-panel.wr::before{background:#3b82f6}
+.app-hdr{font-size:.85rem;font-weight:900;margin-bottom:6px;display:flex;justify-content:space-between}
+.app-hdr.bug{color:#f87171}.app-hdr.fix{color:#4ade80}.app-hdr.wr{color:#60a5fa}
+
+.code-box{background:#000;border:1px solid #1e293b;border-radius:6px;font-family:monospace;font-size:.65rem;color:#a8b2d1;padding:8px;margin-bottom:8px;line-height:1.4;box-shadow:inset 0 0 10px #000}
+.code-box .kw{color:#c678dd}.code-box .fn{color:#61afef}.code-box .str{color:#98c379}.code-box .cm{color:#5c6370;font-style:italic}
+.code-hl{background:#ef444440;border-radius:3px;padding:0 2px}
+
+/* Execution Log for reading */
+.exec-log{background:#0a0f1a;border:1px solid #1e293b;border-radius:6px;padding:6px;font-size:.65rem;font-family:monospace;flex:1;overflow-y:auto;max-height:150px;display:flex;flex-direction:column;gap:3px;box-shadow:inset 0 0 8px #000}
+.log-row{padding:3px;border-radius:4px;display:flex;gap:6px;align-items:center;background:#1e293b40}
+.log-row.new{animation:slideIn .3s ease-out}
+.log-f{color:#61afef;font-weight:bold;width:45px}
+.log-op{color:#c678dd}
+.log-nd{padding:1px 4px;border-radius:3px;font-weight:bold;color:#111827}
+.log-nd.A{background:#facc15}.log-nd.B{background:#f87171}.log-nd.C{background:#4ade80}
+.log-res.ok{color:#4ade80}.log-res.err{color:#ef4444;font-weight:bold;animation:flash .5s infinite alternate}
+@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes flash{from{text-shadow:0 0 0 #ef4444}to{text-shadow:0 0 8px #ef4444}}
+
+.wr-fields{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px}
+.wr-f{background:#111827;border:1px solid #1e293b;border-radius:4px;padding:4px;font-size:.65rem;display:flex;justify-content:space-between;align-items:center;color:#94a3b8}
+.wr-f span.val{color:#60a5fa;font-family:monospace;font-weight:bold}
+
+.badge{background:#1e293b;padding:2px 8px;border-radius:10px;font-size:.6rem;color:#cbd5e1;font-weight:700;border:1px solid #334155}
+.badge.red{color:#f87171;border-color:#f8717150;background:#ef444420}
+.stats-bar{display:flex;gap:10px;margin-top:6px}
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚙️ SwapList 数据竞争与翻转剖析</h1>
+  <p class="sub">直观展示为什么 tx->xxx 会引发数据撕裂，以及 advanceNodePtr 的物理含义</p>
+</div>
+
+<div class="controls">
+  <button class="btn btn-go" id="btnRun" onclick="toggle()">▶ 运行仿真演示</button>
+  <button class="btn btn-ghost" onclick="doStep()">⏭ 单步分析</button>
+  <button class="btn btn-ghost" onclick="reset()">↻ 重设环境</button>
+  <span class="spl">仿真速度：<input type="range" id="spdR" min="1" max="5" value="1" oninput="updSpd()"><span id="spdV">1.0x</span></span>
+</div>
+
+<div class="cycle-bar" id="cycBar">
+  <div class="cstep" id="c1">① ecrt_receive</div>
+  <div class="cstep" id="c2">② txSwap 写 next</div>
+  <div class="cstep" id="c3">③ 翻转 txSwap(EtherCAT)</div>
+  <div class="cstep" id="c4">④ rxSwap 读 prev</div>
+  <div class="cstep" id="c5">⑤ ecrt_send</div>
+  <div class="cstep" id="c6">⑥ 应用层读 tx (产生竞态)</div>
+  <div class="cstep" id="c7">⑦ 应用层写 rx + advance</div>
+</div>
+
+<div id="infoBar" class="info">
+  点击 <strong>单步分析</strong> 观察应用层 <code>getMotorActual()</code> 执行到一半时，底层的 EtherCAT 中断如何打断它并翻转物理指针。<br>
+  重点关注：<strong>nodePtr.load() 被多次调用引起的指针重定向！</strong>
+</div>
+
+<div class="scene">
+
+  <!-- ENGINE VIEW (Center/Left) -->
+  <div class="engine-col">
+    <div class="engine-hdr">底层内存转盘 (1个域=2个Swap)</div>
+    
+    <div class="swap-pair">
+      <!-- RX (Write by App, Read by ECAT) -->
+      <div class="swap-col">
+        <div class="swap-lbl rx">📥 rxPDOSwap (指令24B)<br><span style="font-weight:400">命令 → 从站</span></div>
+        <div class="tt">
+          <div class="tt-bg"></div>
+          <div class="tt-ring" id="rxRing">
+            <div class="nd nd-0" id="rxN0"><div class="nd-inner" id="rxI0"></div></div>
+            <div class="nd nd-1" id="rxN1"><div class="nd-inner" id="rxI1"></div></div>
+            <div class="nd nd-2" id="rxN2"><div class="nd-inner" id="rxI2"></div></div>
+          </div>
+          <div class="tt-ptr"><div class="tip"></div><div class="lbl">nodePtr 读写口</div></div>
+        </div>
+      </div>
+      
+      <!-- TX (Write by ECAT, Read by App) -->
+      <div class="swap-col">
+        <div class="swap-lbl tx">📤 txPDOSwap (反馈22B)<br><span style="font-weight:400">从站 → 返回</span></div>
+        <div class="tt">
+          <div class="tt-bg"></div>
+          <div class="tt-ring" id="txRing">
+            <div class="nd nd-0" id="txN0"><div class="nd-inner" id="txI0"></div></div>
+            <div class="nd nd-1" id="txN1"><div class="nd-inner" id="txI1"></div></div>
+            <div class="nd nd-2" id="txN2"><div class="nd-inner" id="txI2"></div></div>
+          </div>
+          <div class="tt-ptr"><div class="tip"></div><div class="lbl">nodePtr 读取口</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TX APP LAYER (Bug vs Fix) -->
+  <div class="app-col">
+    <div class="app-panel bug">
+      <div class="app-hdr bug">❌ BUG: 分步多重 load()<div class="badge red" id="tc1">撕裂: 0</div></div>
+      <div class="code-box">
+<span class="cm">// operator->() 被重载为：</span>
+swap->nodePtr.<span class="fn">load</span>()->memPtr + offset;
+<span class="cm">// 应用层遍历获取属性：</span>
+pos = tx->ActualPosition; <span class="cm">← 调用 load()</span>
+vel = tx->ActualVelocity; <span class="cm">← 再次 load()</span>
+tor = tx->ActualTorque;   <span class="cm">← 再次 load()</span>
+      </div>
+      <div class="exec-log" id="bgLog"></div>
+    </div>
+
+    <!-- RX APP LAYER (Write & Advance) -->
+    <div class="app-panel wr">
+      <div class="app-hdr wr">✏️ setMotorTarget() 写入<div class="badge" id="wc1">控制循环</div></div>
+      <div class="code-box">
+<span class="cm">// 1. 连续写命令到当前 node</span>
+rx->TgtPos = 1.0; rx->TgtVel = 0.0;
+...
+<span class="cm">// 2. 全部完工，推进指针！！</span>
+swap-><span class="fn">advanceNodePtr</span>(); <span class="cm">// 触发旋转</span>
+      </div>
+      <div class="wr-fields" id="wrFlds">
+        <div class="wr-f">TgtPos <span class="val" id="wp1">-</span></div>
+        <div class="wr-f">TgtVel <span class="val" id="wp2">-</span></div>
+        <div class="wr-f">TgtTor <span class="val" id="wp3">-</span></div>
+        <div class="wr-f">Mode <span class="val" id="wp4">-</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Logic & State
+let spd=1, running=false, timer=null;
+let txNpi=0, txRot=0, txFrame=100;
+let rxNpi=0, rxRot=0, rxFrame=50;
+let phase='idle';
+let stepQ=[]; // execution step queue
+
+function ndName(i) { return ['A','B','C'][i]; }
+function nextOf(i){ return (i+1)%3; }
+function prevOf(i){ return (i+2)%3; }
+
+function msg(html) { document.getElementById('infoBar').innerHTML = html; }
+
+function setCycle(c, colorClass='act') {
+  for(let i=1;i<=7;i++) {
+    const el = document.getElementById('c'+i);
+    el.className = 'cstep';
+    if(i===c) { el.classList.add('act'); el.classList.add(colorClass); }
+  }
+}
+
+function updTT(prefix, npi, rot, frame, isRx) {
+  document.getElementById(prefix+'Ring').style.transform = `rotate(${rot}deg)`;
+  for(let i=0;i<3;i++) {
+    const nd = document.getElementById(prefix+'N'+i);
+    const inn = document.getElementById(prefix+'I'+i);
+    inn.style.transform = `rotate(${-rot}deg)`;
+    
+    nd.className = 'nd nd-'+i;
+    if(i===npi) nd.classList.add('cur');
+    else if(i===nextOf(npi)) nd.classList.add('nxt');
+    else nd.classList.add('prv');
+
+    let r = i===npi ? 'CUR' : (i===nextOf(npi)?'NXT':'PRV');
+    
+    // Label
+    inn.innerHTML = `<span style="font-size:.65rem;color:#fff">${ndName(i)}</span><br><span style="font-size:.3rem;color:#cbd5e1">${r}</span>`;
+  }
+}
+
+function hlNode(prefix, idx, cls) {
+  document.getElementById(prefix+'N'+idx).classList.add(cls);
+  setTimeout(()=>document.getElementById(prefix+'N'+idx).classList.remove(cls), 600/spd);
+}
+
+function addLog(id, fld, ndIdx, frm, tear) {
+  const c = document.getElementById(id);
+  const row = document.createElement('div');
+  row.className = 'log-row new';
+  const ndN = ndName(ndIdx);
+  const resCls = tear ? 'log-res err' : 'log-res ok';
+  const resTxt = tear ? '⚡ 撕裂！(脏数据)' : '✓ 成功';
+  row.innerHTML = `
+    <span class="log-f">${fld}</span>
+    <span class="log-op">load()</span>
+    <span>➡</span>
+    <span class="log-nd ${ndN}">节点 ${ndN}</span>
+    <span>(帧 ${frm})</span>
+    <span class="${resCls}">${resTxt}</span>
+  `;
+  c.appendChild(row);
+  c.scrollTop = c.scrollHeight;
+}
+
+let tearingCount=0;
+let bReads = ['ActPos', 'ActVel', 'ActTor', 'Status'];
+let bVals = [1, 2, 3, 4];
+let bStartNd = -1, bStartFrm = -1;
+
+function clearLog() {
+  document.getElementById('bgLog').innerHTML = '';
+}
+
+// SIMULATION STEPS definition
+const SIM = {
+  ecat_rx: () => {
+    phase='ecat'; setCycle(1);
+    msg("<strong>① ecrt_master_receive():</strong> 从 EtherCAT 网卡读取 TxPDO 数据包（反馈）");
+  },
+  ecat_tx_write: () => {
+    phase='ecat'; setCycle(2, 'red');
+    txFrame++;
+    hlNode('tx', nextOf(txNpi), 'highlight-tx');
+    msg(`<strong>② txPDOSwap.copyFrom():</strong> 复制最新帧 <code>[帧 ${txFrame}]</code> 数据到 txSwap 的 <strong class="red">NEXT 节点 ${ndName(nextOf(txNpi))}</strong>`);
+  },
+  ecat_tx_flip: () => {
+    phase='ecat'; setCycle(3, 'red');
+    txNpi = nextOf(txNpi);
+    txRot -= 120;
+    updTT('tx', txNpi, txRot);
+    msg(`<strong>③ txPDOSwap 翻转！</strong> <code>nodePtr.store(node->next)</code>。<br><strong class="red">转盘旋转 120°</strong>，新的 Current 取代了旧位置，节点 ${ndName(txNpi)} 到达 nodePtr 读取口。`);
+  },
+  ecat_rx_read: () => {
+    phase='ecat'; setCycle(4, 'grn');
+    hlNode('rx', prevOf(rxNpi), 'highlight-rx');
+    msg(`<strong>④ rxPDOSwap.copyTo():</strong> 从 rxSwap 的 <strong class="grn">PREVIOUS 节点 ${ndName(prevOf(rxNpi))}</strong> 拷贝命令帧 [帧 ${rxFrame}] 准备下发`);
+  },
+  ecat_send: () => {
+    phase='ecat'; setCycle(5);
+    msg("<strong>⑤ ecrt_master_send():</strong> 将组装好的命令帧下发给 EtherCAT 从站电机");
+  },
+  // the tricky part: application interleaved reading
+  app_read_start: () => {
+    phase='app_r'; setCycle(6, 'pur'); clearLog();
+    bStartNd = -1;
+    msg(`<strong>⑥ 应用层控制循环开始读取反馈数据...</strong>`);
+  },
+  app_read_f: (i) => {
+    phase='app_r'; setCycle(6, 'pur');
+    const fld = bReads[i];
+    const curNd = txNpi; // what nodePtr points to NOW
+    const curFrm = curNd === txNpi ? txFrame : (curNd===prevOf(txNpi)?txFrame-1:txFrame-2); // rough approx for display
+    
+    if (i===0) { bStartNd = curNd; bStartFrm = curFrm; }
+    const tear = (curNd !== bStartNd);
+    if(tear && i>0 && bReads[i-1]==bReads[i-1]) tearingCount++; // Only increment once per sequence if ripped
+
+    document.getElementById('tc1').textContent = `撕裂: ${tearingCount}`;
+    addLog('bgLog', fld, curNd, curFrm, tear);
+    
+    hlNode('tx', curNd, 'highlight-tx'); // Pulse the active node
+
+    if(!tear) {
+      msg(`应用读取 <code>${fld}</code>。<code>nodePtr.load()</code> 指向底部 Current <strong>节点 ${ndName(curNd)}</strong>。一切正常。`);
+    } else {
+      msg(`<strong class="red">🚨 数据撕裂发生！🚨</strong> <code>${fld}</code> 这次 <code>nodePtr.load()</code> 指向了新的 Current <strong>节点 ${ndName(curNd)}</strong>（帧 ${curFrm}）！而之前读的是节点 ${ndName(bStartNd)}（帧 ${bStartFrm}）。同一电机的控制数据被混合拼接！`);
+    }
+  },
+  app_write_f: () => {
+    phase='app_w'; setCycle(7, 'grn');
+    document.getElementById('wp1').textContent = (Math.random()*10).toFixed(2);
+    document.getElementById('wp2').textContent = (Math.random()*5).toFixed(2);
+    document.getElementById('wp3').textContent = (Math.random()*5).toFixed(2);
+    document.getElementById('wp4').textContent = '8 [CSP]';
+    hlNode('rx', rxNpi, 'highlight-rx');
+    msg(`<strong>⑦ setMotorTarget() 应用层写入:</strong> 一次性写入命令到 rxSwap 的 Current <strong>节点 ${ndName(rxNpi)}</strong>。写入过程中指针没动。`);
+  },
+  app_write_adv: () => {
+    phase='app_w'; setCycle(7, 'grn');
+    rxFrame++;
+    rxNpi = nextOf(rxNpi);
+    rxRot -= 120;
+    updTT('rx', rxNpi, rxRot);
+    msg(`<strong>⑧ app_loop 末尾的 advanceNodePtr()!</strong><br>写入完毕，物理指针推进！<code>nodePtr.store(next)</code>。<br>rxSwap <strong class="grn">转盘旋转 120°</strong>。刚刚写好控制参数的节点，现在转移到了 <strong>PREVIOUS</strong>，等待 EtherCAT 回来拿走它！`);
+  }
+};
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms/(spd*0.8))); }
+
+async function runScenario() {
+  if(!running) return;
+
+  // Scenario 1: Clean ECAT cycle + App Read (No Tearing)
+  SIM.ecat_rx(); await delay(500); if(!running)return;
+  SIM.ecat_tx_write(); await delay(600); if(!running)return;
+  SIM.ecat_tx_flip(); await delay(600); if(!running)return;
+  SIM.ecat_rx_read(); await delay(500); if(!running)return;
+  SIM.ecat_send(); await delay(500); if(!running)return;
+  
+  SIM.app_read_start(); await delay(400); if(!running)return;
+  SIM.app_read_f(0); await delay(400); if(!running)return;
+  SIM.app_read_f(1); await delay(400); if(!running)return;
+  SIM.app_read_f(2); await delay(400); if(!running)return;
+  SIM.app_read_f(3); await delay(400); if(!running)return;
+
+  SIM.app_write_f(); await delay(600); if(!running)return;
+  SIM.app_write_adv(); await delay(1000); if(!running)return;
+
+  setCycle(0);
+  msg("👆 此周期很完美，应用读取较快，没有被 EtherCAT 打断。准备下一帧演示极端情况！");
+  await delay(1500); if(!running)return;
+
+  // Scenario 2: Data Tearing! ECAT interrupts App read
+  SIM.app_read_start(); await delay(400); if(!running)return;
+  SIM.app_read_f(0); await delay(500); if(!running)return;
+  SIM.app_read_f(1); await delay(500); if(!running)return;
+  
+  // -- INTERRUPTION --
+  msg("<span class='red'>⚠️ 注意：后台 EtherCAT 定时器触发，抢占 CPU！</span>");
+  document.getElementById('infoBar').style.boxShadow = "0 0 20px #ef444450";
+  await delay(1000); if(!running)return;
+  document.getElementById('infoBar').style.boxShadow = "none";
+  
+  SIM.ecat_rx(); await delay(300); if(!running)return;
+  SIM.ecat_tx_write(); await delay(400); if(!running)return;
+  SIM.ecat_tx_flip(); await delay(800); if(!running)return; // TURNTABLE FLIPS
+  SIM.ecat_rx_read(); await delay(300); if(!running)return;
+  SIM.ecat_send(); await delay(500); if(!running)return;
+
+  // -- APP RESUMES --
+  msg("⚠️ EtherCAT 完成抢占。应用层控制线程苏醒，继续执行读取剩余字段的代码...");
+  await delay(1000); if(!running)return;
+
+  SIM.app_read_f(2); await delay(800); if(!running)return; // TEAR HAPPENS HERE
+  SIM.app_read_f(3); await delay(800); if(!running)return;
+  
+  SIM.app_write_f(); await delay(600); if(!running)return;
+  SIM.app_write_adv(); await delay(1500); if(!running)return;
+
+  // loop back
+  if(running) requestAnimationFrame(runScenario);
+}
+
+function updSpd() {
+  spd = document.getElementById('spdR').value;
+  document.getElementById('spdV').textContent = Number(spd).toFixed(1) + 'x';
+}
+
+function toggle() {
+  running = !running;
+  const b = document.getElementById('btnRun');
+  if(running) {
+    b.textContent = '⏸ 暂停演示';
+    b.className = 'btn btn-stop';
+    runScenario();
+  } else {
+    b.textContent = '▶ 开始演示';
+    b.className = 'btn btn-go';
+  }
+}
+
+let mstep=0;
+let manualSeq = [
+  SIM.ecat_rx, SIM.ecat_tx_write, SIM.ecat_tx_flip, SIM.ecat_rx_read, SIM.ecat_send,
+  SIM.app_read_start, ()=>SIM.app_read_f(0), ()=>SIM.app_read_f(1), 
+  SIM.ecat_tx_write, SIM.ecat_tx_flip, // interleave manual flip!
+  ()=>SIM.app_read_f(2), ()=>SIM.app_read_f(3),
+  SIM.app_write_f, SIM.app_write_adv
+];
+
+function doStep() {
+  if(running) toggle();
+  manualSeq[mstep % manualSeq.length]();
+  mstep++;
+}
+
+function reset() {
+  running = false;
+  document.getElementById('btnRun').textContent = '▶ 开始演示';
+  document.getElementById('btnRun').className = 'btn btn-go';
+  txNpi=0; txRot=0; txFrame=100;
+  rxNpi=0; rxRot=0; rxFrame=50;
+  tearingCount=0; mstep=0;
+  document.getElementById('tc1').textContent = '撕裂: 0';
+  document.getElementById('wp1').textContent = '-';
+  document.getElementById('wp2').textContent = '-';
+  document.getElementById('wp3').textContent = '-';
+  document.getElementById('wp4').textContent = '-';
+  clearLog();
+  updTT('tx', txNpi, txRot); updTT('rx', rxNpi, rxRot);
+  setCycle(0);
+  msg("环境已重置。可【开始演示】或使用【单步分析】查看极端的打断情况！");
+}
+
+updTT('tx', txNpi, txRot);
+updTT('rx', rxNpi, rxRot);
+
+</script>
+</body>
+</html>

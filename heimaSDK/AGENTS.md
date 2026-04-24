@@ -1,30 +1,73 @@
-# Repository Guidelines
+# AGENTS.md — heimaSDK
 
-## Project Structure & Module Organization
-- This directory holds the C/C++20 EtherCAT driver stack: `loong_driver_sdk.*` orchestrates buses, `ecat.*` wraps the EtherCAT master, `rs232.*` and `rs485.*` cover serial links, `config_xml.*` parses `config.xml` to build alias/type maps, `common.*` and `ptr_que.h` provide shared data structures, `tinyxml2.*` is vendored XML support, and `robot_multi_joint_api.c` offers a reference entrypoint.
-- Build outputs land in `build/` (created by scripts); keep `config.xml` beside binaries or provide an absolute path when loading.
+Hardware-facing DriverSDK source tree: EtherCAT + CAN + RS232/RS485 + IMU + demos. Treat this directory as safety-critical.
 
-## Build, Test, and Development Commands
-- `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release` then `cmake --build build --target driver_sdk` to produce `build/libdriver_sdk.so` (expects EtherCAT headers in `/usr/local/include` and `libethercat.so` in `/usr/local/lib`).
-- `cmake --build build --target run_motor` builds the example executable if `main.cpp` is present.
-- `./build.sh` compiles `robot_multi_joint_api.c` into `build/libethercat_robot.so`; override the compiler for cross-builds with `CC=aarch64-linux-gnu-gcc ./build.sh`.
-- Runtime assumes `/usr/local/bin/ethercat` utilities are installed; run on target hardware with real-time privileges (often `sudo`).
+More specific child guidance exists under `web_control/AGENTS.md` for the browser-control subtree.
 
-## Coding Style & Naming Conventions
-- 4-space indentation, brace on the same line, and `namespace DriverSDK` wraps C++ modules.
-- Types and classes use PascalCase (`ECAT`, `SwapList`); C++ methods lean camelCase, while C functions stay snake_case; constants/macros are ALL_CAPS.
-- Preserve packed struct layouts and alignment notes; keep Apache-2.0 headers intact.
+## Structure
 
-## Testing Guidelines
-- No automated test suite is present; rely on hardware-in-loop smoke tests.
-- Typical check: `sudo ./build/run_motor` or a consumer of `libdriver_sdk.so`, while monitoring `ethercat slaves` for link/device state.
-- Validate `config.xml` variants before deployment and watch console logs for PDO offset prints or SDO/reg request warnings.
+```text
+heimaSDK/
+├── heima_driver_sdk.*   # top-level SDK API / orchestration
+├── ecat.*               # EtherCAT master, domains, RT loop
+├── common.* ptr_que.h   # triple-buffer + shared data plumbing
+├── config_xml.*         # config.xml parsing / alias-domain maps
+├── rs232.* rs485.* can.*
+├── yesense*/            # IMU integration
+├── docs/ DATAFLOW.md    # architecture notes worth reading first
+├── web_control/         # separate web-control side path
+└── *_test.cpp *_demo.cpp# hardware smoke tests / demos
+```
 
-## Commit & Pull Request Guidelines
-- Git history is not available here; use concise Conventional Commit-style subjects (e.g., `fix: guard PDO writes during init`).
-- In PRs, describe the hardware setup, expected PDO map, and reproduction steps; attach relevant logs or `ethercat slaves` output when touching bus logic.
-- Call out any ABI changes in public headers and link related issues/task IDs.
+## Where to look
 
-## Configuration & Safety
-- `config.xml` governs alias/type mapping; keep IDs in sync with the actual EtherCAT topology before powering motors.
-- Do not remap axes while the system is running (see safeguards in `robot_multi_joint_api.c`); apply mapping changes offline and restart the stack.
+| Task | Location | Notes |
+|---|---|---|
+| SDK public API | `heima_driver_sdk.h/.cpp` | orchestration entrypoint |
+| EtherCAT domains / RT loop | `ecat.h/.cpp` | core safety-sensitive logic |
+| Triple buffer / wrappers | `common.h/.cpp`, `ptr_que.h` | read these before touching data flow |
+| XML topology parsing | `config_xml.*`, `config*.xml` | alias/type/domain mapping |
+| IMU | `yesense_imu.*`, `yesense/` | serial-based IMU path |
+| Browser/web control | `web_control/` | separate workflow from core SDK |
+| Architecture docs | `DATAFLOW.md`, `docs/*.md`, `框架结构.md` | often faster than reverse-engineering from code |
+
+## Build / run
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target driver_sdk
+cmake --build build --target loong_driver_sdk
+cmake --build build --target leg_smoke_test
+```
+
+Also available:
+
+```bash
+./build.sh
+CC=aarch64-linux-gnu-gcc ./build.sh
+```
+
+## Local rules
+
+- Keep `config.xml` semantics aligned with the physical EtherCAT topology before powering hardware.
+- Do not remap axes or change bus mappings while the system is running.
+- Preserve packed/continuous data layouts and alignment assumptions; several docs call out continuity requirements explicitly.
+- Read `DATAFLOW.md` / `docs/ECAT_DOMAIN_FLOW.md` before changing `ecat.cpp` or `common.cpp`.
+- `tinyxml2.*` is vendored third-party code in-tree; avoid editing unless explicitly required.
+
+## Validation
+
+- There is no software-only unit suite here.
+- Validation is by hardware smoke targets such as:
+  - `leg_smoke_test`
+  - `arm_smoke_test`
+  - `whole_body_smoke_test`
+  - `whole_body_pvt_test`
+  - `test_ankle_hardware`
+- Typical real checks also involve `ethercat slaves` / runtime console logs.
+
+## Safety notes
+
+- Many runs need target hardware, `/usr/local/bin/ethercat`, and real-time privileges.
+- Some demos command motors directly; do not run them casually in automation.
+- `build/` may contain generated outputs; prefer editing sources, not build artifacts.

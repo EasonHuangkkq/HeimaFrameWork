@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heima Robot Web Control</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --text-color: #cbd5e1;
+            --accent-pos: #38bdf8;
+            --accent-kp: #a78bfa;
+            --accent-kd: #fbbf24;
+            --border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(167, 139, 250, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        h1 {
+            text-align: center;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: #fff;
+            margin-bottom: 30px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .motor-card {
+            background: var(--panel-bg);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s;
+        }
+        .motor-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .motor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: var(--border);
+        }
+        .alias-badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #fff;
+            font-weight: bold;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        .control-header span:first-child { opacity: 0.8; }
+        
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.05);
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        
+        input[type="range"].slider-pos::-webkit-slider-thumb { background: var(--accent-pos); box-shadow: 0 0 10px var(--accent-pos); }
+        input[type="range"].slider-kp::-webkit-slider-thumb { background: var(--accent-kp); box-shadow: 0 0 10px var(--accent-kp); }
+        input[type="range"].slider-kd::-webkit-slider-thumb { background: var(--accent-kd); box-shadow: 0 0 10px var(--accent-kd); }
+        input[type="range"].slider-tor::-webkit-slider-thumb { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+        
+        .val-input {
+            width: 60px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            border-radius: 4px;
+            padding: 2px 4px;
+            text-align: right;
+            font-family: monospace;
+        }
+        
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: var(--accent-pos);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>HEIMA PVT WEB CONTROL</h1>
+    <div class="status" id="ws-status">Connecting to WebSocket...</div>
+    <div class="container" id="motor-container">
+        <!-- Motor cards generated here -->
+    </div>
+
+    <script>
+        // Total active motors in Heima (13) + maybe waist/neck
+        const MOTOR_COUNT = 13; 
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+        let ws;
+
+        const defaultLimits = {
+            pos: { min: -3.14, max: 3.14, step: 0.01, val: 0.0 },
+            kp: { min: 0, max: 400, step: 5, val: 200.0 },
+            kd: { min: 0, max: 10, step: 0.1, val: 2.0 },
+            tor: { min: -100, max: 100, step: 0.5, val: 0.0 }
+        };
+
+        function connectWs() {
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => {
+                document.getElementById('ws-status').innerText = '🟢 Connected - Ready to send and receive telemetry';
+                document.getElementById('ws-status').style.color = '#4ade80';
+            };
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'batch') {
+                        data.data.forEach(m => {
+                            const elPos = document.getElementById(`act-pos-${m.alias}`);
+                            if (elPos) {
+                                const posStr = m.pos.toFixed(3);
+                                const velStr = m.vel.toFixed(3);
+                                const torStr = m.tor.toFixed(2);
+                                const tempStr = m.temp + '°C';
+                                const errStr = String(m.err);
+                                
+                                if (elPos.innerText !== posStr) elPos.innerText = posStr;
+                                
+                                const elVel = document.getElementById(`act-vel-${m.alias}`);
+                                if (elVel.innerText !== velStr) elVel.innerText = velStr;
+                                
+                                const elTor = document.getElementById(`act-tor-${m.alias}`);
+                                if (elTor.innerText !== torStr) elTor.innerText = torStr;
+                                
+                                const elTemp = document.getElementById(`act-temp-${m.alias}`);
+                                if (elTemp.innerText !== tempStr) elTemp.innerText = tempStr;
+                                
+                                const elErr = document.getElementById(`act-err-${m.alias}`);
+                                if (elErr.innerText !== errStr) {
+                                    elErr.innerText = errStr;
+                                    elErr.style.color = m.err !== 0 ? '#f87171' : '#cbd5e1';
+                                }
+                            }
+                        });
+                    }
+                } catch (e) {}
+            };
+            ws.onclose = () => {
+                document.getElementById('ws-status').innerText = '🔴 Disconnected - Reconnecting...';
+                document.getElementById('ws-status').style.color = '#f87171';
+                setTimeout(connectWs, 2000);
+            };
+            ws.onerror = (err) => {
+                console.error("WS Error: ", err);
+            };
+        }
+
+        const pendingCmds = {};
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const keys = Object.keys(pendingCmds);
+                if (keys.length > 0) {
+                    keys.forEach(key => {
+                        const c = pendingCmds[key];
+                        ws.send(JSON.stringify({ cmd: c.cmd, alias: c.alias, val: parseFloat(c.val) }));
+                    });
+                    keys.forEach(key => delete pendingCmds[key]);
+                }
+            }
+        }, 20); // 50Hz telemetry cap per slider
+
+        function sendCmd(cmd, alias, val) {
+            pendingCmds[`${cmd}-${alias}`] = {cmd, alias, val};
+        }
+
+        function createMotorCard(alias) {
+            const card = document.createElement('div');
+            card.className = 'motor-card';
+            
+            card.innerHTML = `
+                <div class="motor-header">
+                    <span>Motor Data</span>
+                    <span class="alias-badge">Alias: ${alias}</span>
+                </div>
+                <div class="motor-telemetry" style="display:flex; justify-content:space-between; font-size: 0.8em; margin-bottom:15px; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 4px;">
+                    <div style="text-align:center;">Pos<br><span id="act-pos-${alias}" style="color:var(--accent-pos)">0.000</span></div>
+                    <div style="text-align:center;">Vel<br><span id="act-vel-${alias}" style="color:var(--accent-kd)">0.000</span></div>
+                    <div style="text-align:center;">Tor<br><span id="act-tor-${alias}" style="color:#ef4444">0.00</span></div>
+                    <div style="text-align:center;">Temp<br><span id="act-temp-${alias}" style="color:#f59e0b">0°C</span></div>
+                    <div style="text-align:center;">Err<br><span id="act-err-${alias}" style="color:#cbd5e1">0</span></div>
+                </div>
+            `;
+
+            ['pos', 'kp', 'kd', 'tor'].forEach(param => {
+                const limits = defaultLimits[param];
+                const group = document.createElement('div');
+                group.className = 'control-group';
+                
+                group.innerHTML = `
+                    <div class="control-header">
+                        <span>${param.toUpperCase()}</span>
+                        <input type="number" class="val-input" id="in-${param}-${alias}" value="${limits.val}" step="${limits.step}" min="${limits.min}" max="${limits.max}">
+                    </div>
+                    <input type="range" class="slider-${param}" id="sl-${param}-${alias}" min="${limits.min}" max="${limits.max}" step="${limits.step}" value="${limits.val}">
+                `;
+                
+                card.appendChild(group);
+            });
+
+            return card;
+        }
+
+        function setupListeners(alias) {
+            ['pos', 'kp', 'kd', 'tor'].forEach(param => {
+                const slider = document.getElementById(`sl-${param}-${alias}`);
+                const input = document.getElementById(`in-${param}-${alias}`);
+                
+                // Slider updates Input + WebSocket
+                slider.addEventListener('input', (e) => {
+                    input.value = e.target.value;
+                    sendCmd(param, alias, e.target.value);
+                });
+
+                // Input updates Slider + WebSocket
+                input.addEventListener('change', (e) => {
+                    let v = parseFloat(e.target.value);
+                    if (v > slider.max) v = slider.max;
+                    if (v < slider.min) v = slider.min;
+                    slider.value = v;
+                    input.value = v;
+                    sendCmd(param, alias, v);
+                });
+            });
+        }
+
+        function init() {
+            const container = document.getElementById('motor-container');
+            for (let i = 1; i <= MOTOR_COUNT; i++) {
+                container.appendChild(createMotorCard(i));
+            }
+            for (let i = 1; i <= MOTOR_COUNT; i++) {
+                setupListeners(i);
+            }
+            connectWs();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

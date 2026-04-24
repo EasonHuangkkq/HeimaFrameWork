@@ -1,0 +1,1026 @@
+EtherCAT 伺服电机控制
+使用指南
+基于 CiA402 设备协议的对象字典详解与操作教程
+MT_Device — MyActuator EtherCAT 伺服驱动器
+MyActuator 技术文档
+2026 年 2 月 8 日目录
+第一章 概述 1
+1.1 文档目的 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1
+1.2 设备基本信息 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1
+1.3 支持的运行模式 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1
+1.4 EtherCAT 通信架构 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2
+第二章 CiA402 状态机 3
+2.1 状态机概述 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+2.2 状态定义 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+2.3 状态转换命令 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+2.4 标准使能步骤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+2.5 状态字位定义详解 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+第三章 对象字典总览 6
+3.1 对象字典分类 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+3.2 对象字典完整列表 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+第四章 CiA402 标准对象字典详解 9
+4.1 控制字 — Control Word (0x6040) . . . . . . . . . . . . . . . . . . . . . . . 9
+4.2 状态字 — Status Word (0x6041) . . . . . . . . . . . . . . . . . . . . . . . 10
+4.3 运行模式 — Modes of Operation (0x6060) . . . . . . . . . . . . . . . . . . 10
+4.4 运行模式显示 — Modes of Operation Display (0x6061) . . . . . . . . . . . 11
+4.5 目标位置 — Target Position (0x607A) . . . . . . . . . . . . . . . . . . . . 11
+4.6 目标速度 — Target Velocity (0x60FF) . . . . . . . . . . . . . . . . . . . . 12
+4.7 目标力矩 — Target Torque (0x6071) . . . . . . . . . . . . . . . . . . . . . 12
+4.8 实际反馈对象 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+4.8.1 实际位置 — Position Actual Value (0x6064) . . . . . . . . . . . . . 13
+4.8.2 实际速度 — Velocity Actual Value (0x606C) . . . . . . . . . . . . . 13
+4.8.3 实际力矩 — Torque Actual Value (0x6077) . . . . . . . . . . . . . 13
+4.8.4 错误代码 — Error Code (0x603F) . . . . . . . . . . . . . . . . . . 14
+ii目录 iii
+4.9 轮廓参数对象 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+4.9.1 轮廓速度 — Profile Velocity (0x6081) . . . . . . . . . . . . . . . . 14
+4.9.2 轮廓加速度 — Profile Acceleration (0x6083) . . . . . . . . . . . . . 15
+4.9.3 轮廓减速度 — Profile Deceleration (0x6084) . . . . . . . . . . . . . 15
+4.9.4 快停减速度 — Quick Stop Deceleration (0x6085) . . . . . . . . . . 15
+4.10 位置监控参数 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+4.10.1 软件位置限位 — Software Position Limit (0x607D) . . . . . . . . . 15
+4.10.2 跟随误差窗口 — Following Error Window (0x6065) . . . . . . . . . 16
+4.10.3 跟随误差超时 — Following Error Window Time Out (0x6066) . . . 16
+4.10.4 位置窗口 — Position Window (0x6067) . . . . . . . . . . . . . . . 16
+4.10.5 位置窗口时间 — Position Window Time (0x6068) . . . . . . . . . 16
+4.11 偏移量/前馈对象 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+4.11.1 位置偏移 — Position Offset (0x60B0) . . . . . . . . . . . . . . . . 17
+4.11.2 速度偏移（速度前馈）— Velocity Offset (0x60B1) . . . . . . . . . 17
+4.11.3 力矩偏移（力矩前馈）— Torque Offset (0x60B2) . . . . . . . . . . 17
+4.12 最大力矩 — Max Torque (0x6072) . . . . . . . . . . . . . . . . . . . . . . 17
+4.13 电机额定电流 — Motor Rate Current (0x6075) . . . . . . . . . . . . . . . 18
+4.14 回零参数 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+4.14.1 回零方法 — Homing Method (0x6098) . . . . . . . . . . . . . . . . 18
+4.14.2 回零速度 — Homing Speeds (0x6099) . . . . . . . . . . . . . . . . 18
+4.14.3 回零加速度 — Homing Acceleration (0x609A) . . . . . . . . . . . . 18
+4.15 插补时间周期 — Interpolation Time Period (0x60C2) . . . . . . . . . . . . 19
+第五章 厂商自定义对象字典详解 20
+5.1 PVT/MIT 模式参数 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+5.1.1 PVT_KP (0x2000) . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+5.1.2 PVT_KD (0x2001) . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+5.2 PID 调节参数 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+5.3 状态监控对象 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+5.3.1 电机温度 — Motor Temperature (0x2009) . . . . . . . . . . . . . . 21
+5.3.2 母线电压 — Voltage (0x200A) . . . . . . . . . . . . . . . . . . . . 21
+5.3.3 第一编码器值 — First Encoder Value (0x200B) . . . . . . . . . . . 22
+5.3.4 驱动器温度 — Drive Temperature (0x200C) . . . . . . . . . . . . . 22
+第六章 PDO 映射配置 23
+6.1 PDO 映射原理 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+6.2 RxPDO 映射对象（主站 → 从站） . . . . . . . . . . . . . . . . . . . . . . 23
+6.2.1 RxPDO Mapping 0 (0x1600) — 标准控制通道 . . . . . . . . . . . 23iv 目录
+6.2.2 RxPDO Mapping 1 (0x1601) — PVT 控制通道 . . . . . . . . . . . 23
+6.2.3 RxPDO Mapping 2 (0x1602) — 轮廓参数通道 . . . . . . . . . . . 24
+6.2.4 RxPDO Mapping 3 (0x1603) — 偏移/前馈通道 . . . . . . . . . . . 25
+6.3 TxPDO 映射对象（从站 → 主站） . . . . . . . . . . . . . . . . . . . . . . 25
+6.3.1 TxPDO Mapping 0 (0x1A00) — 标准状态通道 . . . . . . . . . . . 25
+6.3.2 TxPDO Mapping 1 (0x1A01) — 扩展状态通道（含编码器） . . . . 26
+6.3.3 TxPDO Mapping 2 (0x1A02) — 扩展状态通道（含温度/电压） . . 26
+6.3.4 TxPDO Mapping 3 (0x1A03) — 位置需求/跟随误差 . . . . . . . . 27
+6.4 SM-PDO 分配 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+6.4.1 RxPDO 分配 (0x1C12) . . . . . . . . . . . . . . . . . . . . . . . . 27
+6.4.2 TxPDO 分配 (0x1C13) . . . . . . . . . . . . . . . . . . . . . . . . . 27
+6.5 动态 PDO 映射支持 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+6.5.1 动态 PDO 映射概述 . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+6.5.2 技术原理 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+6.5.3 实现机制 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+6.5.4 使用说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+6.5.5 PDO 映射变量查找机制 . . . . . . . . . . . . . . . . . . . . . . . . 30
+6.5.6 PDO 数据映射流程 . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+第七章 运行模式详解与操作步骤 33
+7.1 周期同步位置模式 (CSP, Mode 8) . . . . . . . . . . . . . . . . . . . . . . 33
+7.1.1 功能说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+7.1.2 所需 PDO . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+7.1.3 操作步骤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+7.2 周期同步速度模式 (CSV, Mode 9) . . . . . . . . . . . . . . . . . . . . . . 34
+7.2.1 功能说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+7.2.2 操作步骤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+7.3 周期同步力矩模式 (CST, Mode 10) . . . . . . . . . . . . . . . . . . . . . . 34
+7.3.1 功能说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+7.3.2 操作步骤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+7.4 轮廓位置模式 (PP, Mode 1) . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+7.4.1 功能说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+7.4.2 相关对象 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+7.4.3 操作步骤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+7.5 轮廓速度模式 (PV, Mode 3) . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+7.5.1 功能说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+7.5.2 操作步骤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+7.6 PVT 模式 / MIT 模式 (Mode 5) . . . . . . . . . . . . . . . . . . . . . . . 36目录 v
+7.6.1 功能说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+7.6.2 操作步骤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+7.7 回零模式 (Homing, Mode 6) . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+7.7.1 功能说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+7.7.2 操作步骤 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 38
+7.8 快速停机功能 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 38
+7.8.1 触发方式 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 38
+7.8.2 停机行为 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 38
+第八章 单位换算参考 39
+8.1 位置单位 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39
+8.2 速度单位 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39
+8.3 加速度单位 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39
+8.4 力矩单位 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+第九章 常见操作示例 41
+9.1 示例 1：CSP 模式控制电机运动 . . . . . . . . . . . . . . . . . . . . . . . 41
+9.2 示例 2：PP 模式点位运动 . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+9.3 示例 3：PVT/MIT 模式阻抗控制 . . . . . . . . . . . . . . . . . . . . . . . 43
+9.4 示例 4：通过 SDO 调节 PID 参数 . . . . . . . . . . . . . . . . . . . . . . 43
+第十章 故障处理 45
+10.1 故障检测 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+10.2 故障恢复流程 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+第十一章 附录 46
+11.1 控制字快速参考 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 46
+11.2 状态字快速参考 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+11.3 ESI 文件说明 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47vi 目录第一章 概述
+1.1 文档目的
+本文档是 MyActuator EtherCAT 伺服驱动器的完整使用指南。文档基于固件源代
+码编写，详细介绍了如何通过 EtherCAT 总线使用 CiA402 设备协议对电机进行控制。
+本文档面向初次使用 EtherCAT 伺服驱动器的工程师，内容涵盖：
+• EtherCAT 通信基础概念
+• CiA402 状态机的工作原理与控制流程
+• 所有对象字典的详细功能说明和使用方法
+• 各种运行模式（PP、PV、CSP、CSV、CST、PVT、Homing）的操作步骤
+• PDO/SDO 映射配置方法
+• 单位换算与参数配置说明
+1.2 设备基本信息
+表 1.1: 设备基本参数
+参数 对象索引 值
+设备名称 0x1008 MT_Device
+设备类型 0x1000 0x00000192 (CiA402 驱动器)
+Vendor ID 0x1018:01 0x202008
+Product Code 0x1018:02 0x00000000
+Revision Number 0x1018:03 0x00010000
+SSC 版本 — 5.12
+1.3 支持的运行模式
+本驱动器支持以下 CiA402 运行模式（对象 0x6502 Supported Drive Modes =
+0x00006025） ：
+12 第一章 概述
+表 1.2: 支持的运行模式
+模式值 模式名称 英文缩写 0x6502 对应位
+1 轮廓位置模式 PP Bit 0
+3 轮廓速度模式 PV Bit 2
+5 PVT 模式 (MIT 模式) PVT Bit 5
+6 回零模式 Homing Bit 13
+8 周期同步位置模式 CSP Bit 7 ( 自定义)
+9 周期同步速度模式 CSV Bit 8 ( 自定义)
+10 周期同步力矩模式 CST Bit 9 ( 自定义)
+1.4 EtherCAT 通信架构
+EtherCAT 通信系统由主站 （Master）和从站 （Slave）组成。 本驱动器作为EtherCAT
+从站设备，通过 ESC（EtherCAT Slave Controller）芯片与主站通信。
+通信数据分为两类：
+• 过程数据对象（PDO）：用于周期性实时数据交换，如控制字、目标位置、实际位
+置等
+• 服务数据对象（SDO）：用于非实时参数配置，如 PID 参数、限位设置等
+注意
+PDO 通信是实时的， 在每个通信周期内自动交换数据， 适合控制命令和状态反馈。
+SDO 通信是请求/响应式的，适合参数读写和配置操作。第二章 CiA402 状态机
+2.1 状态机概述
+CiA402 设备协议定义了一个标准的状态机，用于管理驱动器的运行状态。驱动器
+必须按照规定的状态转换路径来启动和控制电机。
+控制字（Controlword, 0x6040）和状态字（Statusword, 0x6041）是状态机的核心控
+制和反馈接口。
+2.2 状态定义
+表 2.1: CiA402 状态机状态定义
+状态名称 状态字 (bit 6~0) 说明
+Not Ready To Switch On xxxx.xxxx.x0xx.0000 初始化中，驱动器未就绪
+Switch On Disabled xxxx.xxxx.x1xx.0000 驱动无故障，等待命令
+Ready To Switch On xxxx.xxxx.x01x.0001 准备就绪，等待上电
+Switched On xxxx.xxxx.x01x.0011 已上电，等待使能
+Operation Enabled xxxx.xxxx.x01x.0111 运行中，伺服使能
+Quick Stop Active xxxx.xxxx.x00x.0111 快速停机中
+Fault Reaction Active xxxx.xxxx.x0xx.1111 故障反应中
+Fault xxxx.xxxx.x0xx.1000 故障状态
+34 第二章 CIA402 状态机
+2.3 状态转换命令
+表 2.2: 控制字命令与对应转换
+命令 控制字值 掩码 转换
+Shutdown 0x0006 0x0087 → Ready To Switch
+On
+Switch On 0x0007 0x00C7 → Switched On
+Enable Operation 0x000F 0x008F → Operation Enabled
+Disable Voltage 0x0000 0x0082 → Switch On Dis-
+abled
+Quick Stop 0x0002 0x0086 → Quick Stop Active
+Disable Operation 0x0007 0x008F → Switched On
+Fault Reset 0x0080 0x0080 Fault → Switch On
+Disabled
+2.4 标准使能步骤
+以下是通过 EtherCAT 主站使能驱动器的标准步骤：
+1. 设置运行模式：写入 0x6060（Modes of Operation ） ，例如写入8 表示 CSP 模式
+2. 发送 Shutdown 命令：写入控制字 0x6040 = 0x0006
+3. 等待状态字：读取 0x6041，确认进入 Ready To Switch On 状态（0x0X21）
+4. 发送 Switch On 命令：写入控制字 0x6040 = 0x0007
+5. 等待状态字：读取 0x6041，确认进入 Switched On 状态（0x0X23）
+6. 发送 Enable Operation ：写入控制字 0x6040 = 0x000F
+7. 等待状态字：读取 0x6041，确认进入 Operation Enabled 状态（0x0X27）
+提示
+也可以直接从 Switch On Disabled 状态发送 0x000F， 驱动器会自动经过中间状态
+完成使能。完整序列为：0x0006 → 0x0007 → 0x000F。2.5 状态字位定义详解 5
+警告
+在 Fault 状态下，必须先发送 Fault Reset（控制字 bit7 上升沿，即 0x0080） ，驱
+动器会执行系统复位（NVIC_SystemReset） ，然后重新开始使能流程。
+2.5 状态字位定义详解
+表 2.3: 状态字（0x6041）各位功能
+位 名称 说明
+Bit 0~3, 5~6 状态机状态 表示当前 CiA402 状态机所处的状态
+Bit 4 Voltage Enabled 高压使能标志，正常时为 1
+Bit 7 Warning 警告标志
+Bit 9 Remote 控制字已处理标志，正常时为 1
+Bit 10 Target Reached 目标到达标志（PP/PV 模式使用）
+Bit 11 Internal Limit Active 内部限制激活标志
+Bit 12 Drive Follows Command 驱动器跟随命令值 （CSP/CSV/CST 模式设
+置）
+Bit 13 Following Error 跟随误差超限标志第三章 对象字典总览
+3.1 对象字典分类
+本驱动器的对象字典按地址范围划分为以下几类：表 3.1: 对象字典分类
+地址范围 分类 说明
+0x1000~0x1FFF 通信相关 PDO 映射、SM 分配等
+0x2000~0x2FFF 厂商自定义 PID 参数、温度、电压等
+0x6000~0x6FFF CiA402 标准 控制字、状态字、运行模式等
+3.2 对象字典完整列表
+表 3.2: 对象字典完整列表
+索引 数据类型 名称 访问 说明
+0x6040 UINT16 Control Word R W/PDO 控制字
+0x6041 UINT16 Status Word RO/PDO 状态字
+0x6060 INT8 Modes of Opera-
+tion
+R W/PDO 运行模式设置
+0x6061 INT8 Modes of Op Dis-
+play
+RO/PDO 运行模式回显
+0x607A INT32 Target Position R W/PDO 目标位置
+0x60FF INT32 Target Velocity R W/PDO 目标速度
+0x6071 INT16 Target Torque R W/PDO 目标力矩
+0x6064 INT32 Position Actual RO/PDO 实际位置
+0x606C INT32 Velocity Actual RO/PDO 实际速度
+0x6077 INT16 Torque Actual RO/PDO 实际力矩
+0x603F UINT16 Error Code RO/PDO 错误代码
+续下页
+63.2 对象字典完整列表 7
+表 3.2 – 续
+索引 数据类型 名称 访问 说明
+0x6072 UINT16 Max Torque R W/PDO 最大力矩
+0x6075 INT32 Motor Rate Cur-
+rent
+R W 电机额定电流
+0x6081 UINT32 Profile Velocity R W/PDO 轮廓速度
+0x6083 UINT32 Profile Acceleration R W/PDO 轮廓加速度
+0x6084 UINT32 Profile Decelera-
+tion
+R W/PDO 轮廓减速度
+0x6085 UINT32 Quick Stop Decel R W/PDO 快停减速度
+0x607D RECORD Software Pos Limit R W 软件位置限位
+0x6062 INT32 Pos Demand Value RO/PDO 位置需求值
+0x6065 UINT32 Following Err Win-
+dow
+R W 跟随误差窗口
+0x6066 UINT16 Following Err
+Timeout
+R W 跟随误差超时
+0x6067 UINT32 Position Window R W 位置窗口
+0x6068 UINT16 Position Window
+Time
+R W 位置窗口时间
+0x60F4 INT32 Following Err Ac-
+tual
+RO/PDO 跟随误差实际值
+0x605A INT16 Quickstop Option R W 快停选项代码
+0x605B INT16 Shutdown Option R W 停机选项代码
+0x605C INT16 Disable Op Option R W 禁止运行选项
+0x605E INT16 Fault React Code R W 故障反应代码
+0x60B0 INT32 Position Offset R W/PDO 位置偏移
+0x60B1 INT32 Velocity Offset R W/PDO 速度偏移 (前馈)
+0x60B2 INT16 Torque Offset R W/PDO 力矩偏移 (前馈)
+0x6098 INT8 Homing Method R W 回零方法
+0x6099 RECORD Homing Speeds R W 回零速度
+0x609A UINT16 Homing Accelera-
+tion
+R W 回零加速度
+0x60C2 RECORD Interp Time Period R W 插补周期
+0x6502 UINT32 Supported Drive
+Modes
+RO 支持的驱动模式
+续下页8 第三章 对象字典总览
+表 3.2 – 续
+索引 数据类型 名称 访问 说明
+0x2000 INT32 PVT_KP R W/PDO PVT 模式 KP 参数
+0x2001 INT32 PVT_KD R W/PDO PVT 模式 KD 参数
+0x2002 REAL32 CUR_LOOP_KP R W 电流环 KP
+0x2003 REAL32 CUR_LOOP_KI R W 电流环 KI
+0x2004 REAL32 SPD_LOOP_KP R W 速度环 KP
+0x2005 REAL32 SPD_LOOP_KI R W 速度环 KI
+0x2006 REAL32 POS_LOOP_KP R W 位置环 KP
+0x2007 REAL32 POS_LOOP_KI R W 位置环 KI
+0x2008 REAL32 POS_LOOP_KD R W 位置环 KD
+0x2009 INT16 Motor Tempera-
+ture
+RO/PDO 电机温度
+0x200A UINT16 Voltage RO/PDO 母线电压
+0x200B INT32 First Encoder
+Value
+RO/PDO 第一编码器值
+0x200C INT16 Drive Temperature RO/PDO 驱动器温度第四章 CiA402 标准对象字典详解
+4.1 控制字 — Control Word (0x6040)
+属性 值
+索引 0x6040
+数据类型 UINT16 (16 位无符号)
+访问权限 读写，支持 RxPDO 映射
+默认值 0x0000
+控制字是主站向驱动器发送命令的核心接口，各位定义如下：表 4.1: 控制字各位功能定义
+位 名称 说明
+Bit 0 Switch On 开机命令
+Bit 1 Enable Voltage 使能电压
+Bit 2 Quick Stop 快速停机（低电平有效）
+Bit 3 Enable Operation 使能运行
+Bit 4 模式相关 PP: 新设定点触发; PV: 斜坡使能
+Bit 5 PP: Change Set Immediately PP 模式立即更换设定点
+Bit 6 PP: Abs/Rel PP 模式：0= 绝对，1= 相对
+Bit 7 Fault Reset 故障复位（上升沿触发）
+Bit 8 Halt PP 模式暂停
+Bit 12 参数保存 特殊值 4096(0x1000) 用于参数保存序列
+910 第四章 CIA402 标准对象字典详解
+参数保存功能
+本驱动器通过控制字实现参数保存功能，步骤如下：
+1. 写入 ControlWord = 0 （初始化第一阶段）
+2. 写入 ControlWord = 4096 （0x1000，触发保存）
+3. 在 3 秒内写回 ControlWord = 0 （确认保存，数据写入 Flash）
+4.2 状态字 — Status Word (0x6041)
+属性 值
+索引 0x6041
+数据类型 UINT16 (16 位无符号)
+访问权限 只读，支持 TxPDO 映射
+默认值 0x0000
+状态字用于反馈驱动器当前运行状态，主站通过读取状态字判断驱动器状态。
+4.3 运行模式 — Modes of Operation (0x6060)
+属性 值
+索引 0x6060
+数据类型 INT8 (8 位有符号)
+访问权限 读写，支持 RxPDO 映射
+默认值 0x00
+表 4.2: 运行模式值定义
+值 模式 说明
+1 Profile Position (PP) 轮廓位置模式，带梯形轨迹规划
+3 Profile Velocity (PV) 轮廓速度模式，带加减速规划
+5 PVT (MIT 模式) 位置-速度-力矩混合控制
+6 Homing 回零模式，设置当前位置为零点
+8 Cyclic Sync Position (CSP) 周期同步位置模式，主站插补
+9 Cyclic Sync Velocity (CSV) 周期同步速度模式
+10 Cyclic Sync Torque (CST) 周期同步力矩模式4.4 运行模式显示 — MODES OF OPERATION DISPLAY (0X6061) 11
+4.4 运行模式显示 — Modes of Operation Display
+(0x6061)
+属性 值
+索引 0x6061
+数据类型 INT8 (8 位有符号)
+访问权限 只读，支持 TxPDO 映射
+回显当前实际运行模式。 当驱动器存在故障时 （FaultCode ̸= 0） ， 此对象返回0， 表
+示无效模式。
+4.5 目标位置 — Target Position (0x607A)
+属性 值
+索引 0x607A
+数据类型 INT32 (32 位有符号)
+单位 编码器增量 (increments)
+访问权限 读写，支持 RxPDO 映射
+默认值 0
+目标位置用于 PP 模式和 CSP 模式：
+• PP 模式：写入目标位置后，通过控制字 Bit4 上升沿触发轨迹规划执行
+• CSP 模式：每个周期写入的值直接作为位置参考（加上 PositionOffset 0x60B0）
+• PVT 模式：作为期望位置 pdes
+单位换算
+无二级编码器时（EN_SECOND_ENCODER == 0 ） ：
+1 圈 = 131072 增量（17 位编码器） 。
+内部转换公式：
+内部脉冲 = Target Position
+131072 × MotorSingleResolution
+有二级编码器时：
+增量值直接等于编码器脉冲值，无需换算。12 第四章 CIA402 标准对象字典详解
+4.6 目标速度 — Target Velocity (0x60FF)
+属性 值
+索引 0x60FF
+数据类型 INT32 (32 位有符号)
+单位 编码器增量 /秒 (increments/s)
+访问权限 读写，支持 RxPDO 映射
+默认值 0
+• CSV 模式：每周期写入目标速度，驱动器直接跟随
+• PV 模式：写入目标速度后通过 Bit4 触发斜坡规划
+• PVT 模式：作为期望速度 vdes
+单位换算
+从输出端脉冲/秒转换为输入端 RPM：
+RPM = Target Velocity
+Resolution × GearRatio × 60
+其中，无二级编码器时 Resolution = 131072 ，有二级编码器时 Resolution = Mo-
+torSingleResolution。
+4.7 目标力矩 — Target Torque (0x6071)
+属性 值
+索引 0x6071
+数据类型 INT16 (16 位有符号)
+单位 千分之一额定力矩 (permille)
+访问权限 读写，支持 RxPDO 映射
+默认值 0
+• CST 模式：直接力矩控制
+• PVT 模式：作为力矩前馈 tf f4.8 实际反馈对象 13
+单位换算
+力矩值为额定电流的千分比：
+实际电流 = TargetTorque× 0.001 × MOTOR_RATE_IQCURRENT
+例如：TargetTorque = 500 表示 50% 额定力矩。
+4.8 实际反馈对象
+4.8.1 实际位置 — Position Actual Value (0x6064)
+索引 0x6064
+数据类型 INT32
+单位 编码器增量
+访问权限 只读，支持 TxPDO
+内部计算公式：
+Position Actual =
+
+
+
+PosReal
+MotorSingleRes × 131072 无二级编码器
+PosReal 有二级编码器
+4.8.2 实际速度 — Velocity Actual Value (0x606C)
+索引 0x606C
+数据类型 INT32
+单位 编码器增量 /秒
+访问权限 只读，支持 TxPDO
+内部计算公式：
+Velocity Actual = SpdRealFilter × Resolution
+60 × GearRatio
+4.8.3 实际力矩 — Torque Actual Value (0x6077)
+索引 0x6077
+数据类型 INT16
+单位 千分之一额定力矩 (permille)
+访问权限 只读，支持 TxPDO14 第四章 CIA402 标准对象字典详解
+内部计算公式：
+Torque Actual = IqFilter × 1000
+MOTOR_RATE_IQCURRENT
+4.8.4 错误代码 — Error Code (0x603F)
+索引 0x603F
+数据类型 UINT16
+访问权限 只读，支持 TxPDO
+反馈驱动器内部故障代码，0 表示无故障。表 4.3: 错误代码定义
+值 说明
+0x0002 电机堵转
+0x0004 低压
+0x0008 过压
+0x0010 相电流过流
+0x0080 标定参数写入错误
+0x0100 超速
+0x0800 元器件过温
+0x1000 电机温度过温
+0x2000 编码器校准错误
+0x4000 编码器数据错误
+4.9 轮廓参数对象
+4.9.1 轮廓速度 — Profile Velocity (0x6081)
+索引 0x6081
+数据类型 UINT32
+单位 编码器增量 /秒 (increments/s)
+访问权限 读写，支持 RxPDO
+PP 模式下的最大运行速度。写入后自动转换为内部单位：
+POSPLAN_MAXSPD (RPM) = ProfileVelocity
+Resolution × GearRatio × 604.10 位置监控参数 15
+4.9.2 轮廓加速度 — Profile Acceleration (0x6083)
+索引 0x6083
+数据类型 UINT32
+单位 编码器增量 /秒 2 (increments/s2)
+访问权限 读写，支持 RxPDO
+PP/PV 模式下的加速度。写入后自动转换为内部单位：
+POSPLAN_ACC (deg/s 2) = ProfileAcceleration × 360
+Resolution × GearRatio
+4.9.3 轮廓减速度 — Profile Deceleration (0x6084)
+与 0x6083 格式相同，用于 PP/PV 模式的减速度设置。
+4.9.4 快停减速度 — Quick Stop Deceleration (0x6085)
+索引 0x6085
+数据类型 UINT32
+单位 编码器增量 /秒 2
+访问权限 读写，支持 RxPDO
+快速停机时使用的减速度。当 Quick Stop Option Code (0x605A) = 0 时，使用此
+减速度进行减速停车。
+4.10 位置监控参数
+4.10.1 软件位置限位 — Software Position Limit (0x607D)
+子索引 名称 说明
+Sub 1 Min Position Limit 最小位置限位值 (INT32)
+Sub 2 Max Position Limit 最大位置限位值 (INT32)
+PP 模式下的目标位置会被限制在此范围内。16 第四章 CIA402 标准对象字典详解
+4.10.2 跟随误差窗口 — Following Error Window (0x6065)
+索引 0x6065
+数据类型 UINT32
+默认值 131072（1 圈增量）
+允许的最大跟随误差，超出此窗口并持续超过 0x6066 设定的超时时间后，状态字
+Bit13 将置 1。
+4.10.3 跟随误差超时 — Following Error Window Time Out (0x6066)
+索引 0x6066
+数据类型 UINT16
+单位 毫秒 (ms)
+默认值 10
+4.10.4 位置窗口 — Position Window (0x6067)
+索引 0x6067
+数据类型 UINT32
+默认值 100
+当实际位置与目标位置之差的绝对值小于等于此值时，认为在窗口内。设为 0 时禁
+用目标到达判断。
+4.10.5 位置窗口时间 — Position Window Time (0x6068)
+索引 0x6068
+数据类型 UINT16
+单位 毫秒 (ms)
+默认值 10
+在位置窗口内持续超过此时间后， 状态字Bit10（Target Reached）将被设置。 设为
+0 时立即判定到达。4.11 偏移量/前馈对象 17
+4.11 偏移量/前馈对象
+4.11.1 位置偏移 — Position Offset (0x60B0)
+索引 0x60B0
+数据类型 INT32
+单位 编码器增量
+访问权限 读写，支持 RxPDO
+CSP 模式下叠加到目标位置：实际目标 = TargetPosition + PositionOffset。
+4.11.2 速度偏移（速度前馈）— Velocity Offset (0x60B1)
+索引 0x60B1
+数据类型 INT32
+单位 编码器增量 /秒
+访问权限 读写，支持 RxPDO
+写入后转换为速度前馈值，用于 CSP 模式提高轨迹跟踪性能：
+SpdFeed_CSP (RPM) = VelocityOffset
+Resolution × GearRatio × 60
+4.11.3 力矩偏移（力矩前馈）— Torque Offset (0x60B2)
+索引 0x60B2
+数据类型 INT16
+单位 千分之一额定力矩
+访问权限 读写，支持 RxPDO
+写入后转换为电流前馈值：
+feed_current = TorqueOffset × 0.001 × MOTOR_RATE_IQCURRENT
+4.12 最大力矩 — Max Torque (0x6072)
+索引 0x6072
+数据类型 UINT16
+单位 千分之一额定力矩
+访问权限 读写，支持 RxPDO18 第四章 CIA402 标准对象字典详解
+设置速度环的输出限幅（最大力矩限制） ：
+OutMax = MaxTorque × 0.001 × MOTOR_RATE_IQCURRENT
+警告
+计算出的电流值不能超过电机堵转电流（ MOTOR_STALL_IQCURRENT） ，超
+过时会被自动限制。MaxTorque = 0 时恢复为堵转电流限制。
+4.13 电机额定电流 — Motor Rate Current (0x6075)
+索引 0x6075
+数据类型 INT32
+单位 毫安 (mA)
+默认值 MOTOR_RATE_IQCURRENT × 1000
+用于力矩千分比换算的基准值。写入后更新内部额定电流参数，不超过堵转电流。
+4.14 回零参数
+4.14.1 回零方法 — Homing Method (0x6098)
+索引 0x6098
+数据类型 INT8
+本驱动器的回零模式（模式 6）将当前位置设置为零点，并将零点位置保存到内部
+参数。
+4.14.2 回零速度 — Homing Speeds (0x6099)
+子索引 名称 说明
+Sub 1 Speed for Switch Search 寻找开关的速度 (UINT16)
+Sub 2 Speed for Zero Search 寻找零点的速度 (UINT16)
+4.14.3 回零加速度 — Homing Acceleration (0x609A)
+索引 0x609A
+数据类型 UINT164.15 插补时间周期 — INTERPOLATION TIME PERIOD (0X60C2) 19
+4.15 插补时间周期 — Interpolation Time Period
+(0x60C2)
+子索引 名称 默认值
+Sub 1 Interpolation Period 0x10 (16)
+Sub 2 Interpolation Index 0x00
+插补周期 = InterpolationPeriod ×10InterpolationIndex 毫秒。默认 16ms ×100 = 16ms 。第五章 厂商自定义对象字典详解
+5.1 PVT/MIT 模式参数
+5.1.1 PVT_KP (0x2000)
+索引 0x2000
+数据类型 INT32
+访问权限 读写，支持 RxPDO
+默认值 0
+PVT（MIT）模式的位置比例增益。写入值为实际 KP 的 1000 倍：
+实际 kp = PVT_KP × 0.001
+5.1.2 PVT_KD (0x2001)
+索引 0x2001
+数据类型 INT32
+访问权限 读写，支持 RxPDO
+默认值 0
+PVT（MIT）模式的速度微分增益。写入值为实际 KD 的 1000 倍：
+实际 kd = PVT_KD × 0.001
+5.2 PID 调节参数
+以下参数通过 SDO 写入即时生效，用于调整三闭环控制器参数。
+205.3 状态监控对象 21
+表 5.1: PID 参数对象
+索引 名称 类型 控制器
+0x2002 CUR_LOOP_KP REAL32 电流环比例增益
+0x2003 CUR_LOOP_KI REAL32 电流环积分增益
+0x2004 SPD_LOOP_KP REAL32 速度环比例增益
+0x2005 SPD_LOOP_KI REAL32 速度环积分增益
+0x2006 POS_LOOP_KP REAL32 位置环比例增益
+0x2007 POS_LOOP_KI REAL32 位置环积分增益
+0x2008 POS_LOOP_KD REAL32 位置环微分增益
+提示
+PID 参数通过 SDO 写入后立即生效，无需重启。初始值从驱动器内部配置参数
+加载。修改 PID 参数后可通过参数保存功能（控制字序列 0 → 4096 → 0）写入
+Flash。
+5.3 状态监控对象
+5.3.1 电机温度 — Motor Temperature (0x2009)
+索引 0x2009
+数据类型 INT16
+单位 ◦C
+访问权限 只读，支持 TxPDO
+5.3.2 母线电压 — Voltage (0x200A)
+索引 0x200A
+数据类型 UINT16
+单位 V ( 伏特)
+访问权限 只读，支持 TxPDO
+母线电压实际值（Vbus 直接取整） 。22 第五章 厂商自定义对象字典详解
+5.3.3 第一编码器值 — First Encoder Value (0x200B)
+索引 0x200B
+数据类型 INT32
+访问权限 只读，支持 TxPDO
+读取第一编码器的绝对位置值（AbsolutePos） 。
+5.3.4 驱动器温度 — Drive Temperature (0x200C)
+索引 0x200C
+数据类型 INT16
+单位 ◦C
+访问权限 只读，支持 TxPDO
+驱动器 MOS 管温度。第六章 PDO 映射配置
+6.1 PDO 映射原理
+PDO（过程数据对象）是 EtherCAT 周期性数据交换的核心机制。PDO 分为：
+• RxPDO（接收 PDO） ：主站→ 从站的数据（输出过程数据）
+• TxPDO（发送 PDO） ：从站→ 主站的数据（输入过程数据）
+6.2 RxPDO 映射对象（主站 → 从站）
+6.2.1 RxPDO Mapping 0 (0x1600) — 标准控制通道
+这是最常用的 RxPDO 映射，包含基本控制所需的全部对象：表 6.1: 0x1600 RxPDO Mapping 0 — 标准控制
+子索引 映射对象 名称 位宽
+1 0x6040:00 Control Word 16 bit
+2 0x607A:00 Target Position 32 bit
+3 0x60FF:00 Target Velocity 32 bit
+4 0x6071:00 Target Torque 16 bit
+5 0x6072:00 Max Torque 16 bit
+6 0x6060:00 Modes of Operation 8 bit
+7 0x2FFD:00 Dummy Byte1 ( 填充) 8 bit
+总计 128 bit = 16 字节
+6.2.2 RxPDO Mapping 1 (0x1601) — PVT 控制通道
+在标准通道基础上增加了 PVT/MIT 模式的 KP、KD 参数：
+2324 第六章 PDO 映射配置
+表 6.2: 0x1601 RxPDO Mapping 1 — PVT 控制
+子索引 映射对象 名称 位宽
+1 0x6040:00 Control Word 16 bit
+2 0x607A:00 Target Position 32 bit
+3 0x60FF:00 Target Velocity 32 bit
+4 0x6071:00 Target Torque 16 bit
+5 0x2000:00 PVT_KP 32 bit
+6 0x2001:00 PVT_KD 32 bit
+7 0x6060:00 Modes of Operation 8 bit
+8 0x2FFD:00 Dummy Byte1 ( 填充) 8 bit
+总计 176 bit = 22 字节
+6.2.3 RxPDO Mapping 2 (0x1602) — 轮廓参数通道
+表 6.3: 0x1602 RxPDO Mapping 2 — 轮廓参数
+子索引 映射对象 名称 位宽
+1 0x6081:00 Profile Velocity 32 bit
+2 0x6083:00 Profile Acceleration 32 bit
+3 0x6084:00 Profile Deceleration 32 bit
+4 0x6085:00 Quick Stop Deceleration 32 bit
+总计 128 bit = 16 字节6.3 TXPDO 映射对象（从站 → 主站） 25
+6.2.4 RxPDO Mapping 3 (0x1603) — 偏移/前馈通道
+表 6.4: 0x1603 RxPDO Mapping 3 — 偏移/前馈
+子索引 映射对象 名称 位宽
+1 0x60B0:00 Position Offset 32 bit
+2 0x60B1:00 Velocity Offset 32 bit
+3 0x60B2:00 Torque Offset 16 bit
+总计 80 bit = 10 字节
+6.3 TxPDO 映射对象（从站 → 主站）
+6.3.1 TxPDO Mapping 0 (0x1A00) — 标准状态通道
+表 6.5: 0x1A00 TxPDO Mapping 0 — 标准状态
+子索引 映射对象 名称 位宽
+1 0x6041:00 Status Word 16 bit
+2 0x6064:00 Position Actual Value 32 bit
+3 0x606C:00 Velocity Actual Value 32 bit
+4 0x6077:00 Torque Actual Value 16 bit
+5 0x603F:00 Error Code 16 bit
+6 0x6061:00 Modes of Op Display 8 bit
+7 0x2FFE:00 Dummy Byte2 ( 填充) 8 bit
+总计 128 bit = 16 字节26 第六章 PDO 映射配置
+6.3.2 TxPDO Mapping 1 (0x1A01) — 扩展状态通道（含编码器）
+表 6.6: 0x1A01 TxPDO Mapping 1 — 含编码器
+子索引 映射对象 名称 位宽
+1 0x6041:00 Status Word 16 bit
+2 0x6064:00 Position Actual Value 32 bit
+3 0x606C:00 Velocity Actual Value 32 bit
+4 0x6077:00 Torque Actual Value 16 bit
+5 0x603F:00 Error Code 16 bit
+6 0x200B:00 First Encoder Value 32 bit
+7 0x6061:00 Modes of Op Display 8 bit
+8 0x2FFE:00 Dummy Byte2 ( 填充) 8 bit
+总计 160 bit = 20 字节
+6.3.3 TxPDO Mapping 2 (0x1A02) — 扩展状态通道（含温度 /电
+压）
+表 6.7: 0x1A02 TxPDO Mapping 2 — 含温度电压
+子索引 映射对象 名称 位宽
+1 0x6041:00 Status Word 16 bit
+2 0x6064:00 Position Actual Value 32 bit
+3 0x606C:00 Velocity Actual Value 32 bit
+4 0x6077:00 Torque Actual Value 16 bit
+5 0x603F:00 Error Code 16 bit
+6 0x2009:00 Motor Temperature 16 bit
+7 0x200C:00 Drive Temperature 16 bit
+8 0x200A:00 Voltage 16 bit
+9 0x6061:00 Modes of Op Display 8 bit
+10 0x2FFE:00 Dummy Byte2 ( 填充) 8 bit
+总计 176 bit = 22 字节6.4 SM-PDO 分配 27
+6.3.4 TxPDO Mapping 3 (0x1A03) — 位置需求/跟随误差
+表 6.8: 0x1A03 TxPDO Mapping 3 — 位置需求/跟随误差
+子索引 映射对象 名称 位宽
+1 0x6062:00 Position Demand Value 32 bit
+2 0x60F4:00 Following Error Actual Value 32 bit
+总计 64 bit = 8 字节
+6.4 SM-PDO 分配
+6.4.1 RxPDO 分配 (0x1C12)
+属性 说明
+索引 0x1C12
+默认激活通道数 1（仅激活 0x1600）
+可用通道 0x1600, 0x1601, 0x1602, 0x1603
+修改时机 PreOP 状态下
+6.4.2 TxPDO 分配 (0x1C13)
+属性 说明
+索引 0x1C13
+默认激活通道数 1（仅激活 0x1A00）
+可用通道 0x1A00, 0x1A01, 0x1A02, 0x1A03
+修改时机 PreOP 状态下
+注意
+PDO 分配在 PreOP 状态下修改。例如要使用 PVT 模式，需要将 RxPDO 分配
+修改为使用 0x1601 通道。修改步骤：
+1. SDO 写入 0x1C12:00 = 0 （清空分配）
+2. SDO 写入 0x1C12:01 = 0x1601 （分配通道 1）
+3. SDO 写入 0x1C12:00 = 1 （设置激活通道数）
+同理可配置多通道同时使用。28 第六章 PDO 映射配置
+注意
+所有通道都支持动态 PDO。第七章 运行模式详解与操作步骤
+7.1 周期同步位置模式 (CSP, Mode 8)
+7.1.1 功能说明
+CSP 模式下， 主站每个通信周期发送目标位置， 驱动器直接跟随。轨迹规划完全在
+主站侧完成，驱动器只负责位置闭环跟踪。
+7.1.2 所需 PDO
+• RxPDO：Control Word (0x6040) 、Target Position (0x607A) 、Modes of Operation
+(0x6060)
+• TxPDO：Status Word (0x6041) 、Position Actual (0x6064)
+• 可选：Position Offset (0x60B0) 、Velocity Offset (0x60B1) 、Torque Offset (0x60B2)
+7.1.3 操作步骤
+1. 在 PreOP 状态配置 PDO 映射（默认 0x1600 + 0x1A00 即可）
+2. 写入 Modes of Operation (0x6060) = 8
+3. 执行 CiA402 状态机使能序列：0x0006 → 0x0007 → 0x000F
+4. 每个周期写入 Target Position (0x607A)
+5. 读取 Position Actual (0x6064) 确认跟随效果
+提示
+CSP 模式支持速度前馈（0x60B1）和力矩前馈（0x60B2） ，可以显著改善轨迹跟
+踪性能。推荐在高精度应用中使用 RxPDO Mapping 3 (0x1603) 配合使用。
+2930 第七章 运行模式详解与操作步骤
+7.2 周期同步速度模式 (CSV, Mode 9)
+7.2.1 功能说明
+CSV 模式下，主站每周期发送目标速度，驱动器直接跟随速度指令，无轨迹规划。
+7.2.2 操作步骤
+1. 配置 PDO 映射
+2. 写入 Modes of Operation (0x6060) = 9
+3. 执行状态机使能序列
+4. 每个周期写入 Target Velocity (0x60FF)，单位：increments/s
+5. 读取 Velocity Actual (0x606C) 确认跟随效果
+7.3 周期同步力矩模式 (CST, Mode 10)
+7.3.1 功能说明
+CST 模式下，主站每周期发送目标力矩，驱动器直接执行力矩（电流）控制。
+7.3.2 操作步骤
+1. 配置 PDO 映射
+2. 写入 Modes of Operation (0x6060) = 10
+3. 执行状态机使能序列
+4. 每个周期写入 Target Torque (0x6071)，单位：千分之一额定力矩
+5. 读取 Torque Actual (0x6077) 确认跟随效果
+警告
+CST 模式直接控制电机力矩， 无速度/位置保护。 使用前请确保已设置Max Torque
+(0x6072) 进行限流保护，防止过流烧毁电机。7.4 轮廓位置模式 (PP, MODE 1) 31
+7.4 轮廓位置模式 (PP, Mode 1)
+7.4.1 功能说明
+PP 模式下，主站设置目标位置和运动参数（速度、加速度、减速度） ，驱动器内部
+完成梯形轨迹规划并执行位置运动。
+7.4.2 相关对象
+• 目标位置：0x607A Target Position
+• 轮廓速度：0x6081 Profile Velocity
+• 轮廓加速度：0x6083 Profile Acceleration
+• 轮廓减速度：0x6084 Profile Deceleration
+• 位置限位：0x607D Software Position Limit
+• 位置窗口：0x6067、0x6068 用于目标到达判断
+• 跟随误差：0x6065、0x6066、0x60F4
+7.4.3 操作步骤
+1. 配置 PDO 映射（推荐同时激活 0x1600 和 0x1602）
+2. 写入 Modes of Operation (0x6060) = 1
+3. 通过 SDO 或 PDO 设置运动参数：
+• 0x6081 Profile Velocity
+• 0x6083 Profile Acceleration
+• 0x6084 Profile Deceleration
+• 0x607D Software Position Limit （可选）
+4. 执行状态机使能序列
+5. 写入 Target Position (0x607A) = 目标位置值
+6. 设置控制字 Bit4 上升沿触发运动（例如：先写 0x000F，再写 0x001F）
+7. 监控 Status Word Bit10 （Target Reached）判断是否到达32 第七章 运行模式详解与操作步骤
+PP 模式控制字 Bit4 触发机制
+PP 模式使用控制字 Bit4（New Setpoint） 的上升沿触发新的位置运动。 具体操作：
+1. 写入目标位置 0x607A
+2. 控制字 Bit4 从 0 变为 1（例如 0x000F → 0x001F）
+3. 驱动器开始轨迹规划并运动
+4. 运动完成后 StatusWord Bit10 = 1
+5. 要运动到新位置，先将 Bit4 清 0，再重复上述步骤
+7.5 轮廓速度模式 (PV, Mode 3)
+7.5.1 功能说明
+PV 模式下，主站设置目标速度和加减速参数，驱动器内部完成速度斜坡规划。
+7.5.2 操作步骤
+1. 配置 PDO 映射
+2. 写入 Modes of Operation (0x6060) = 3
+3. 设置运动参数（Profile Acceleration 0x6083 、Profile Deceleration 0x6084 ）
+4. 执行状态机使能序列
+5. 写入 Target Velocity (0x60FF)
+6. 设置控制字 Bit4 上升沿触发速度规划
+7. 监控 Status Word Bit10 判断目标速度是否到达（容差 ± 50 增量）
+7.6 PVT 模式 / MIT 模式 (Mode 5)
+7.6.1 功能说明
+PVT 模式（也称 MIT 模式）是一种混合控制模式，输出力矩由以下公式计算：
+τ = Kp · (pdes − pf b) + Kd · (vdes − vf b) + tf f
+其中：7.7 回零模式 (HOMING, MODE 6) 33
+• pdes：期望位置（从 0x607A 获取，转换为弧度）
+• pf b：实际位置反馈
+• vdes：期望速度（从 0x60FF 获取，转换为弧度/秒）
+• vf b：实际速度反馈
+• Kp：位置增益（从 0x2000 PVT_KP 获取）
+• Kd：速度增益（从 0x2001 PVT_KD 获取）
+• tf f：力矩前馈（从 0x6071 Target Torque 获取）
+7.6.2 操作步骤
+1. 配置 PDO： 必须使用RxPDO Mapping 1 (0x1601)， 因为需要PVT_KP 和 PVT_KD
+• SDO 写入 0x1C12:00 = 0
+• SDO 写入 0x1C12:01 = 0x1601
+• SDO 写入 0x1C12:00 = 1
+2. 写入 Modes of Operation (0x6060) = 5
+3. 执行状态机使能序列
+4. 每周期写入：
+• 0x607A Target Position （位置指令，单位：增量）
+• 0x60FF Target Velocity（速度指令，单位：增量/秒）
+• 0x6071 Target Torque（力矩前馈，单位：千分之一额定）
+• 0x2000 PVT_KP （位置增益 × 1000）
+• 0x2001 PVT_KD （速度增益 × 1000）
+提示
+PVT/MIT 模式非常适合机器人关节控制和阻抗控制等应用场景。通过调节 KP
+和 KD 可以实现不同的刚度和阻尼特性。
+7.7 回零模式 (Homing, Mode 6)
+7.7.1 功能说明
+回零模式将当前电机位置设置为零点。执行后内部零点参数（PosZero）将被更新。34 第七章 运行模式详解与操作步骤
+7.7.2 操作步骤
+1. 写入 Modes of Operation (0x6060) = 6
+2. 执行状态机使能序列
+3. 驱动器自动将当前位置设为零点
+4. 零点设置完成后，切换到其他运行模式继续使用
+7.8 快速停机功能
+7.8.1 触发方式
+在 Operation Enabled 状态下，发送 Quick Stop 命令（控制字 = 0x0002 ） 。
+7.8.2 停机行为
+根据 Quick Stop Option Code (0x605A) 的设置：
+• 0x605A = 0 ： 使用Quick Stop Deceleration (0x6085) 减速到零速后自动转到 Switch
+On Disabled 状态第八章 常见操作示例
+8.1 示例 1：CSP 模式控制电机运动
+以下是使用 CSP 模式控制电机的完整流程（伪代码） ：
+1 // 1. 进 入 PreOP 状 态 后 ， 配 置 PDO 映 射
+2 // 使 用 默 认 0x1600 + 0x1A00 即 可
+3
+4 // 2. 切 换 到 SafeOP -> OP 状 态
+5
+6 // 3. 设 置 运 行 模 式 为 CSP
+7 SDO_Write (0 x6060 , 0x00 , 8); // Mode = CSP
+8
+9 // 4. CiA402 状 态 机 使 能
+10 PDO_Write (0 x6040 , 0 x0006 ); // Shutdown
+11 Wait_StatusWord (0 x0021 ); // Ready To Switch On
+12 PDO_Write (0 x6040 , 0 x0007 ); // Switch On
+13 Wait_StatusWord (0 x0023 ); // Switched On
+14 PDO_Write (0 x6040 , 0 x000F ); // Enable Operation
+15 Wait_StatusWord (0 x0027 ); // Operation Enabled
+16
+17 // 5. 周 期 发 送 目 标 位 置
+18 while ( running ) {
+19 position = TrajectoryGenerator (); // 主 站 轨 迹 规 划
+20 PDO_Write (0 x607A , position ); // Target Position
+21 PDO_Write (0 x60B1 , vel_ff ); // Velocity Offset (
+optional )
+22
+23 actual_pos = PDO_Read (0 x6064 ); // Position Actual
+24 status = PDO_Read (0 x6041 ); // Status Word
+25 }
+26
+3536 第八章 常见操作示例
+Listing 8.1: CSP 模式操作示例
+8.2 示例 2：PP 模式点位运动
+1 // 1. 设 置 运 行 模 式 为 PP
+2 SDO_Write (0 x6060 , 0x00 , 1); // Mode = PP
+3
+4 // 2. 配 置 运 动 参 数
+5 SDO_Write (0 x6081 , 0x00 , 10000) ; // Profile Velocity (inc /s)
+6 SDO_Write (0 x6083 , 0x00 , 50000) ; // Profile Acceleration
+7 SDO_Write (0 x6084 , 0x00 , 50000) ; // Profile Deceleration
+8
+9 // 3. CiA402 使 能
+10 PDO_Write (0 x6040 , 0 x0006 ); // Shutdown
+11 PDO_Write (0 x6040 , 0 x0007 ); // Switch On
+12 PDO_Write (0 x6040 , 0 x000F ); // Enable Operation
+13
+14 // 4. 发 送 目 标 位 置 并 触 发 运 动
+15 PDO_Write (0 x607A , 131072) ; // Target : 1 turn (for 17- bit )
+16 PDO_Write (0 x6040 , 0 x001F ); // Enable + New Setpoint (bit4
+=1)
+17
+18 // 5. 等 待 到 达
+19 while (!( PDO_Read (0 x6041 ) & 0 x0400 )) {
+20 // Wait for Target Reached (bit10 )
+21 }
+22
+23 // 6. 准 备 下 一 个 运 动 ： 清 除 bit4
+24 PDO_Write (0 x6040 , 0 x000F );
+25
+26 // 7. 设 置 新 目 标 并 再 次 触 发
+27 PDO_Write (0 x607A , 0); // Target : back to zero
+28 PDO_Write (0 x6040 , 0 x001F ); // Trigger new setpoint
+29
+Listing 8.2: PP 模式操作示例8.3 示例 3：PVT/MIT 模式阻抗控制 37
+8.3 示例 3：PVT/MIT 模式阻抗控制
+1 // 1. 在 PreOP 状 态 配 置 PDO 映 射 为 0x1601
+2 SDO_Write (0 x1C12 , 0x00 , 0); // Clear
+3 SDO_Write (0 x1C12 , 0x01 , 0 x1601 ); // Use Mapping 1
+4 SDO_Write (0 x1C12 , 0x00 , 1); // Activate
+5
+6 // 2. 设 置 运 行 模 式 为 PVT
+7 SDO_Write (0 x6060 , 0x00 , 5); // Mode = PVT
+8
+9 // 3. CiA402 使 能
+10 PDO_Write (0 x6040 , 0 x0006 );
+11 PDO_Write (0 x6040 , 0 x0007 );
+12 PDO_Write (0 x6040 , 0 x000F );
+13
+14 // 4. 周 期 发 送 PVT 控 制 命 令
+15 while ( running ) {
+16 PDO_Write (0 x607A , target_pos ); // Position ( increments )
+17 PDO_Write (0 x60FF , target_vel ); // Velocity (inc /s)
+18 PDO_Write (0 x6071 , torque_ff ); // Torque FF ( permille )
+19 PDO_Write (0 x2000 , kp * 1000) ; // KP (x1000 )
+20 PDO_Write (0 x2001 , kd * 1000) ; // KD (x1000 )
+21 }
+22
+Listing 8.3: PVT/MIT 模式操作示例
+8.4 示例 4：通过 SDO 调节 PID 参数
+1 // 读 取 当 前 PID 参 数
+2 cur_kp = SDO_Read_Float (0 x2002 , 0x00); // CUR_LOOP_KP
+3 cur_ki = SDO_Read_Float (0 x2003 , 0x00); // CUR_LOOP_KI
+4 spd_kp = SDO_Read_Float (0 x2004 , 0x00); // SPD_LOOP_KP
+5 spd_ki = SDO_Read_Float (0 x2005 , 0x00); // SPD_LOOP_KI
+6 pos_kp = SDO_Read_Float (0 x2006 , 0x00); // POS_LOOP_KP
+7 pos_ki = SDO_Read_Float (0 x2007 , 0x00); // POS_LOOP_KI
+8 pos_kd = SDO_Read_Float (0 x2008 , 0x00); // POS_LOOP_KD
+9
+10 // 修 改 速 度 环 参 数38 第八章 常见操作示例
+11 SDO_Write_Float (0 x2004 , 0x00 , 2.5) ; // SPD_KP = 2.5
+12 SDO_Write_Float (0 x2005 , 0x00 , 0.01) ; // SPD_KI = 0.01
+13
+14 // 保 存 参 数 到 Flash
+15 SDO_Write (0 x6040 , 0x00 , 0); // Step 1: ControlWord = 0
+16 SDO_Write (0 x6040 , 0x00 , 4096) ; // Step 2: ControlWord = 4096
+17 SDO_Write (0 x6040 , 0x00 , 0); // Step 3: ControlWord = 0 (
+save )
+18
+Listing 8.4: SDO 调节 PID 参数示例第九章 故障处理
+9.1 故障检测
+驱动器通过以下方式报告故障：
+• 状态字：当驱动器进入 Fault 状态时，状态字变为 0x0X08
+• Error Code (0x603F) ：返回具体的故障代码
+• 运行模式回显 (0x6061)：故障时返回 0
+9.2 故障恢复流程
+1. 检查 Error Code (0x603F) 确认故障原因
+2. 排除故障原因
+3. 发送 Fault Reset 命令：设置控制字 Bit7（0x0080）
+4. 驱动器执行系统复位
+5. 等待驱动器重新初始化
+6. 重新执行 CiA402 状态机使能序列
+警告
+Fault Reset 会触发系统复位（NVIC_SystemReset） ，驱动器将重新初始化。所有
+运行时参数将恢复为默认值，需要重新配置。
+39第十章 附录
+10.1 控制字快速参考
+表 10.1: 控制字命令快速参考
+操作 控制字值 十六进制
+关机 (Shutdown) 0000_0110 0x0006
+上电 (Switch On) 0000_0111 0x0007
+使能运行 (Enable Operation) 0000_1111 0x000F
+禁止电压 (Disable Voltage) 0000_0000 0x0000
+快停 (Quick Stop) 0000_0010 0x0002
+故障复位 (Fault Reset) 1000_0000 0x0080
+PP 新设定点触发 0001_1111 0x001F
+4010.2 状态字快速参考 41
+10.2 状态字快速参考
+表 10.2: 状态字值快速参考
+状态 典型值 (低 7 位)
+Not Ready To Switch On 0x0000
+Switch On Disabled 0x0040
+Ready To Switch On 0x0021
+Switched On 0x0023
+Operation Enabled 0x0027
+Quick Stop Active 0x0007
+Fault Reaction Active 0x000F
+Fault 0x0008
+注意
+状态字的实际值还包含 Bit4 (Voltage Enabled) 、Bit9 (Remote) 等标志位。例如
+Operation Enabled 的完整典型值为 0x0237（包含 Voltage Enabled 和 Remote 标
+志） 。
+10.3 ESI 文件说明
+本驱动器的 ESI（EtherCAT Slave Information） 文件为MT-Device.xml， 用于Ether-
+CAT 主站软件识别和配置从站设备。 将此文件导入主站配置工具 （如TwinCAT、SOEM
+等）后，主站即可自动识别 PDO 映射和对象字典。

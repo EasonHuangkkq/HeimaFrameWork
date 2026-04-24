@@ -80,6 +80,12 @@ action_scale:
   - 1.0    # Waist motor 2
   - 1.0    # Waist motor 3
 
+safety:
+  action_clip: 1.0
+  target_pos_min: -2.0
+  target_pos_max: 2.0
+  pvt_max_vel: 10.0
+
 # Observation scaling factors (for neural network input normalization)
 # These scales are applied to observations before feeding to the neural network
 observation_scales:
@@ -91,4 +97,3 @@ observation_scales:
     - 1.0                 # vx (forward/backward)
     - 1.0                 # vy (left/right)
     - 1.0                # wz (yaw rate)
-

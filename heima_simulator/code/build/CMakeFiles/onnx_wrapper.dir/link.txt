@@ -1,2 +1,0 @@
-/usr/bin/ar qc libonnx_wrapper.a CMakeFiles/onnx_wrapper.dir/onnx_wrapper.cpp.o
-/usr/bin/ranlib libonnx_wrapper.a

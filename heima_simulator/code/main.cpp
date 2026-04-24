@@ -127,7 +127,7 @@ void updateCommandsFromKeyboard() {
 bool USE_ANKLE_SOLVER = true;  // Set to true to enable ankle kinematics correction
 
 // Apply ankle solver to transform desired ankle pitch/roll into actual motor angles
-void applyAnkleSolver(float target_pos[15], AnkleSolver& ankle_solver) {
+void applyAnkleSolver(float target_pos[13], AnkleSolver& ankle_solver) {
     if (!USE_ANKLE_SOLVER) return;
     
     // right leg ankle (indices 4=pitch, 5=roll)
@@ -170,47 +170,165 @@ float ANG_VEL_SCALE = 0.25f;
 float DOF_POS_SCALE = 1.0f;
 float DOF_VEL_SCALE = 0.05f;
 float CMD_SCALE[3] = {2.0f, 2.0f, 0.25f};
+float CMD_FILTER_ALPHA = 0.05f;
 
 // Default joint angles, action scales, and PD gains (loaded from config file)
 // Order: Left leg [hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll]
 //        Right leg [hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll]
 //        Waist [3 motors]
-float DEFAULT_JOINT_ANGLES[15] = {
+float DEFAULT_JOINT_ANGLES[13] = {
     0.0f, 0.0f, -0.25f, -0.5f, 0.25f, 0.0f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
     0.0f, 0.0f, -0.25f, -0.5f, 0.25f, 0.0f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
-    0.0f, 0.0f, 0.0f  // Waist motors (default values, will be loaded from config)
+    0.0f  // Waist motors (default values, will be loaded from config)
 };
 
-float ACTION_SCALE[15] = {
+float ACTION_SCALE[13] = {
     1.9910780472403882f, 1.9910780472403882f, 1.1352349630969132f, 1.9910780472403882f, 0.8940104439540857f, 0.8940104439540857f,  // Left leg
     1.9910780472403882f, 1.9910780472403882f, 1.1352349630969132f, 1.9910780472403882f, 0.8940104439540857f, 0.8940104439540857f,  // Right leg
-    1.0f, 1.0f, 1.0f  // Waist motors (default values, will be loaded from config)
+    1.0f  // Waist motors (default values, will be loaded from config)
 };
 
-float PD_KP[15] = {
+float PD_KP[13] = {
     40.179f, 40.179f, 99.098f, 40.179f, 16.778f, 16.778f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
     40.179f, 40.179f, 99.098f, 40.179f, 16.778f, 16.778f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
-    200.0f, 200.0f, 200.0f  // Waist motors (default values, will be loaded from config)
+    200.0f  // Waist motors (default values, will be loaded from config)
 };
 
-float PD_KD[15] = {
+float PD_KD[13] = {
     2.558f, 2.558f, 6.309f, 2.558f, 1.068f, 1.068f,  // Left leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
     2.558f, 2.558f, 6.309f, 2.558f, 1.068f, 1.068f,   // Right leg: roll, yaw, pitch, knee, ankle_pitch, ankle_roll
-    1.0f, 1.0f, 1.0f  // Waist motors (default values, will be loaded from config)
+    1.0f  // Waist motors (default values, will be loaded from config)
 };
+
+// Deploy-side safety limits
+float ACTION_CLIP = 1.0f;
+float TARGET_POS_MIN[13] = {
+    -2.0f, -2.0f, -2.0f, -2.0f, -2.0f, -2.0f,
+    -2.0f, -2.0f, -2.0f, -2.0f, -2.0f, -2.0f,
+    -2.0f
+};
+float TARGET_POS_MAX[13] = {
+    2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f,
+    2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f,
+    2.0f
+};
+float PVT_MAX_VEL[13] = {
+    10.0f, 10.0f, 10.0f, 10.0f, 10.0f, 10.0f,
+    10.0f, 10.0f, 10.0f, 10.0f, 10.0f, 10.0f,
+    10.0f
+};
+
+float clampFloat(float value, float min_value, float max_value) {
+    if (value < min_value) {
+        return min_value;
+    }
+    if (value > max_value) {
+        return max_value;
+    }
+    return value;
+}
+
+float sanitizeFinite(float value, float fallback) {
+    if (!std::isfinite(value)) {
+        return fallback;
+    }
+    return value;
+}
+
+float stepTowardLimited(float current, float target, float max_step) {
+    if (!std::isfinite(current)) {
+        current = 0.0f;
+    }
+    if (!std::isfinite(target)) {
+        return current;
+    }
+    if (!std::isfinite(max_step)) {
+        return current;
+    }
+    if (max_step <= 0.0f) {
+        return target;
+    }
+    float error = target - current;
+    if (error > max_step) {
+        return current + max_step;
+    }
+    if (error < -max_step) {
+        return current - max_step;
+    }
+    return target;
+}
+
+bool loadFloatArrayOrScalar(const YAML::Node& node, float target[13], const std::string& config_name) {
+    if (!node) {
+        return false;
+    }
+
+    if (node.IsScalar()) {
+        float value = node.as<float>();
+        for (int i = 0; i < 13; ++i) {
+            target[i] = value;
+        }
+        std::cout << "[Config] Loaded " << config_name << " = " << value << " (applied to all 13 joints)" << std::endl;
+        return true;
+    }
+
+    if (node.IsSequence() && node.size() == 13) {
+        for (size_t i = 0; i < 13; ++i) {
+            target[i] = node[i].as<float>();
+        }
+        std::cout << "[Config] Loaded " << config_name << " from YAML sequence" << std::endl;
+        return true;
+    }
+
+    std::cerr << "[Config] Warning: " << config_name << " must be a scalar or 13-element sequence. Using previous values." << std::endl;
+    return false;
+}
+
+void normalizeSafetyConfig() {
+    if (ACTION_CLIP < 0.0f) {
+        ACTION_CLIP = -ACTION_CLIP;
+    }
+    for (int i = 0; i < 13; ++i) {
+        if (PVT_MAX_VEL[i] < 0.0f) {
+            PVT_MAX_VEL[i] = -PVT_MAX_VEL[i];
+        }
+        if (TARGET_POS_MIN[i] > TARGET_POS_MAX[i]) {
+            float tmp = TARGET_POS_MIN[i];
+            TARGET_POS_MIN[i] = TARGET_POS_MAX[i];
+            TARGET_POS_MAX[i] = tmp;
+        }
+    }
+}
+
+void clipActionsInPlace(std::vector<float>& actions) {
+    for (size_t i = 0; i < actions.size() && i < 12; ++i) {
+        actions[i] = sanitizeFinite(actions[i], 0.0f);
+        actions[i] = clampFloat(actions[i], -ACTION_CLIP, ACTION_CLIP);
+    }
+}
+
+void clampTargetPositions(float target_pos[13]) {
+    for (int i = 0; i < 13; ++i) {
+        target_pos[i] = sanitizeFinite(target_pos[i], DEFAULT_JOINT_ANGLES[i]);
+        target_pos[i] = clampFloat(target_pos[i], TARGET_POS_MIN[i], TARGET_POS_MAX[i]);
+    }
+}
+
+void buildSafeTargetPositions(const std::vector<float>& actions, float target_pos[13]) {
+    for (int i = 0; i < 13; ++i) {
+        target_pos[i] = DEFAULT_JOINT_ANGLES[i];
+        if (i < 12 && i < static_cast<int>(actions.size())) {
+            target_pos[i] += actions[i] * ACTION_SCALE[i];
+        }
+    }
+    clampTargetPositions(target_pos);
+}
 
 // Thread config — default values, can be overridden by YAML
 int ThreadEcatCpu     = 1;   // EtherCAT SDK thread CPU
 int ThreadControlCpu  = 2;   // Main control loop CPU
 int ThreadControlPri  = 88;  // SCHED_FIFO priority (1-99)
 
-// Per-motor maxCurrent for SDK (unsigned short, per-mille of rated current)
-// Default 1000 = same as SDK default. Load from YAML to override.
-unsigned short MAX_CURRENT_SDK[15] = {
-    1000, 1000, 1000, 1000, 1000, 1000,  // Left leg
-    1000, 1000, 1000, 1000, 1000, 1000,  // Right leg
-    1000, 1000, 1000                     // Waist
-};
 
 // Load configuration from YAML file
 bool loadConfigFromYAML(const std::string& config_path) {
@@ -230,27 +348,27 @@ bool loadConfigFromYAML(const std::string& config_path) {
         if (config["pd_gains"]) {
             if (config["pd_gains"]["kp"]) {
                 auto kp_node = config["pd_gains"]["kp"];
-                if (kp_node.size() == 15) {
-                    for (size_t i = 0; i < 15; ++i) {
+                if (kp_node.size() == 13) {
+                    for (size_t i = 0; i < 13; ++i) {
                         PD_KP[i] = kp_node[i].as<float>();
                     }
                     std::cout << "[Config] Loaded PD_KP from " << config_path << std::endl;
                 } else {
                     std::cerr << "[Config] Warning: pd_gains.kp has " << kp_node.size() 
-                              << " elements, expected 15. Using default values." << std::endl;
+                              << " elements, expected 13. Using default values." << std::endl;
                 }
             }
             
             if (config["pd_gains"]["kd"]) {
                 auto kd_node = config["pd_gains"]["kd"];
-                if (kd_node.size() == 15) {
-                    for (size_t i = 0; i < 15; ++i) {
+                if (kd_node.size() == 13) {
+                    for (size_t i = 0; i < 13; ++i) {
                         PD_KD[i] = kd_node[i].as<float>();
                     }
                     std::cout << "[Config] Loaded PD_KD from " << config_path << std::endl;
                 } else {
                     std::cerr << "[Config] Warning: pd_gains.kd has " << kd_node.size() 
-                              << " elements, expected 15. Using default values." << std::endl;
+                              << " elements, expected 13. Using default values." << std::endl;
                 }
             }
         }
@@ -258,31 +376,45 @@ bool loadConfigFromYAML(const std::string& config_path) {
         // Load default joint angles
         if (config["default_joint_angles"]) {
             auto angles_node = config["default_joint_angles"];
-            if (angles_node.size() == 15) {
-                for (size_t i = 0; i < 15; ++i) {
+            if (angles_node.size() == 13) {
+                for (size_t i = 0; i < 13; ++i) {
                     DEFAULT_JOINT_ANGLES[i] = angles_node[i].as<float>();
                 }
                 std::cout << "[Config] Loaded DEFAULT_JOINT_ANGLES from " << config_path << std::endl;
             } else {
                 std::cerr << "[Config] Warning: default_joint_angles has " << angles_node.size() 
-                          << " elements, expected 15. Using default values." << std::endl;
+                          << " elements, expected 13. Using default values." << std::endl;
             }
         }
         
         // Load action scales
         if (config["action_scale"]) {
             auto scale_node = config["action_scale"];
-            if (scale_node.size() == 15) {
-                for (size_t i = 0; i < 15; ++i) {
+            if (scale_node.size() == 13) {
+                for (size_t i = 0; i < 13; ++i) {
                     ACTION_SCALE[i] = scale_node[i].as<float>();
                 }
                 std::cout << "[Config] Loaded ACTION_SCALE from " << config_path << std::endl;
             } else {
                 std::cerr << "[Config] Warning: action_scale has " << scale_node.size() 
-                          << " elements, expected 15. Using default values." << std::endl;
+                          << " elements, expected 13. Using default values." << std::endl;
             }
         }
         
+        if (config["safety"]) {
+            auto safety_node = config["safety"];
+
+            if (safety_node["action_clip"]) {
+                ACTION_CLIP = safety_node["action_clip"].as<float>();
+                std::cout << "[Config] Loaded ACTION_CLIP = " << ACTION_CLIP << std::endl;
+            }
+
+            loadFloatArrayOrScalar(safety_node["target_pos_min"], TARGET_POS_MIN, "safety.target_pos_min");
+            loadFloatArrayOrScalar(safety_node["target_pos_max"], TARGET_POS_MAX, "safety.target_pos_max");
+            loadFloatArrayOrScalar(safety_node["pvt_max_vel"], PVT_MAX_VEL, "safety.pvt_max_vel");
+        }
+        normalizeSafetyConfig();
+
         // Load observation scales
         if (config["observation_scales"]) {
             auto obs_scales = config["observation_scales"];
@@ -321,21 +453,18 @@ bool loadConfigFromYAML(const std::string& config_path) {
                 }
             }
         }
-        
-        // Load per-motor maxCurrent for SDK
-        if(config["max_current"]){
-            auto mc_node = config["max_current"];
-            if(mc_node.size() == 15){
-                for(size_t i = 0; i < 15; ++i){
-                    MAX_CURRENT_SDK[i] = mc_node[i].as<unsigned short>();
-                }
-                std::cout << "[Config] Loaded MAX_CURRENT_SDK from " << config_path << std::endl;
-            }else{
-                std::cerr << "[Config] Warning: max_current has " << mc_node.size()
-                          << " elements, expected 15. Using default values." << std::endl;
+
+        if (config["observation_filter"] && config["observation_filter"]["cmd_alpha"]) {
+            CMD_FILTER_ALPHA = config["observation_filter"]["cmd_alpha"].as<float>();
+            if (CMD_FILTER_ALPHA < 0.0f) {
+                CMD_FILTER_ALPHA = 0.0f;
+            } else if (CMD_FILTER_ALPHA > 1.0f) {
+                CMD_FILTER_ALPHA = 1.0f;
             }
+            std::cout << "[Config] Loaded CMD_FILTER_ALPHA = " << CMD_FILTER_ALPHA << std::endl;
         }
         
+
         // Load thread configuration
         if(config["thread"]){
             auto th = config["thread"];
@@ -366,12 +495,12 @@ bool loadConfigFromYAML(const std::string& config_path) {
 }
 
 // Maximum torque limits for each motor (N·m) - aligned with heima_noarm_config.py
-const float MAX_TORQUE_LIMIT[15] = {
-    120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    120.0f, 80.0f, 120.0f, 150.0f, 120.0f, 120.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
-    150.0f, 150.0f, 150.0f  // Waist motors (if present)
+const float MAX_TORQUE_LIMIT[13] = {
+    120.0f, 80.0f, 120.0f, 130.0f, 120.0f, 120.0f,  // Left leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    120.0f, 80.0f, 120.0f, 130.0f, 120.0f, 120.0f,  // Right leg: hip_roll, hip_yaw, hip_pitch, knee, ankle_pitch, ankle_roll
+    130.0f  // Waist motors (if present)
 };
-// const float MAX_TORQUE_LIMIT[15] = {
+// const float MAX_TORQUE_LIMIT[13] = {
 //     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,  // Left leg
 //     3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f, 3000.0f,   // Right leg
 //     400.0f, 400.0f, 400.0f
@@ -539,12 +668,9 @@ int main(int argc, char** argv) {
     std::cout << "Ctrl+C: Exit" << std::endl;
     std::cout << "========================\n" << std::endl;
     
-    // Build per-motor maxCurrent vector for SDK
-    std::vector<unsigned short> maxCurrentVec(MAX_CURRENT_SDK, MAX_CURRENT_SDK + 15);
-    
     // Initialize robot interface (pass ecatCpu for SDK thread binding, opMode=5 for PVT)
     int opMode = (mode == "real" || mode == "robot") ? 5 : 10;  // PVT for real, CST for sim
-    auto robot = createRobotInterface(mode, config, maxCurrentVec, ThreadEcatCpu, opMode);
+    auto robot = createRobotInterface(mode, config, std::vector<unsigned short>(), ThreadEcatCpu, opMode);
     if (!robot) {
         std::cerr << "Failed to create robot interface" << std::endl;
         return 1;
@@ -584,8 +710,8 @@ int main(int argc, char** argv) {
     // Prepare data structures
     std::vector<float> rpy(3, 0.0f);
     std::vector<float> base_ang_vel(3, 0.0f);
-    std::vector<float> joint_pos(15, 0.0f);  // 12 legs + 3 waist
-    std::vector<float> joint_vel(15, 0.0f);  // 12 legs + 3 waist
+    std::vector<float> joint_pos(13, 0.0f);  // 12 legs + 3 waist
+    std::vector<float> joint_vel(13, 0.0f);  // 12 legs + 3 waist
     
     std::vector<float> observation(45);
     std::vector<float> actions(12, 0.0f);
@@ -600,6 +726,7 @@ int main(int argc, char** argv) {
         cmd_wz = cmd_wz_arg;
     }
     float commands[3] = {0.0f, 0.0f, 0.0f};
+    float filtered_commands[3] = {cmd_vx_arg, cmd_vy_arg, cmd_wz_arg};
 
     // Open CSV file for logging observations
     std::ofstream csv_file("observations_log.csv");
@@ -650,17 +777,18 @@ int main(int argc, char** argv) {
         
         // Store initial positions for interpolation
         std::vector<float> initial_positions = joint_pos;
+        std::vector<float> stage2_command_positions = initial_positions;
         
         const int interpolation_ticks = 5000;  // 5 seconds to move to default
         const int hold_ticks = 10000;          // 10 seconds hold at default
         int stage2_ticks = 0;
         
-        // Prepare PVT vectors (15 motors)
-        std::vector<float> tgtPos(15, 0.0f);
-        std::vector<float> tgtVel(15, 0.0f);
-        std::vector<float> tgtTor(15, 0.0f);
-        std::vector<float> tgtKp(PD_KP, PD_KP +15);
-        std::vector<float> tgtKd(PD_KD, PD_KD +15);
+        // Prepare PVT vectors (13 motors)
+        std::vector<float> tgtPos(13, 0.0f);
+        std::vector<float> tgtVel(13, 0.0f);
+        std::vector<float> tgtTor(13, 0.0f);
+        std::vector<float> tgtKp(PD_KP, PD_KP +13);
+        std::vector<float> tgtKd(PD_KD, PD_KD +13);
         
         while(!g_stop && stage2_ticks < (interpolation_ticks + hold_ticks)){
             // Fetch current state
@@ -676,20 +804,27 @@ int main(int argc, char** argv) {
             }
             
             // Interpolate target positions
-            for(int i = 0; i < 15; ++i){
+            for(int i = 0; i < 13; ++i){
                 if(i < 12){
                     tgtPos[i] = initial_positions[i]*(1.0f -alpha) +DEFAULT_JOINT_ANGLES[i]*alpha;
                 }else{
                     tgtPos[i] = DEFAULT_JOINT_ANGLES[i];
                 }
             }
+
+            for(int i = 0; i < 13; ++i){
+                tgtPos[i] = clampFloat(tgtPos[i], TARGET_POS_MIN[i], TARGET_POS_MAX[i]);
+                float max_step = PVT_MAX_VEL[i] * 0.001f;
+                stage2_command_positions[i] = stepTowardLimited(stage2_command_positions[i], tgtPos[i], max_step);
+                tgtPos[i] = stage2_command_positions[i];
+            }
             
             // Apply ankle solver transformation if enabled
-            // (tgtPos is used as float[15] via data())
-            float target_pos_arr[15];
-            for(int i = 0; i < 15; ++i) target_pos_arr[i] = tgtPos[i];
+            // (tgtPos is used as float[13] via data())
+            float target_pos_arr[13];
+            for(int i = 0; i < 13; ++i) target_pos_arr[i] = tgtPos[i];
             applyAnkleSolver(target_pos_arr, ankle_solver);
-            for(int i = 0; i < 15; ++i) tgtPos[i] = target_pos_arr[i];
+            for(int i = 0; i < 13; ++i) tgtPos[i] = target_pos_arr[i];
             
             // Send PVT command: driver does kp*(pos-actual) + kd*(0-vel) + 0
             robot->writePVT(tgtPos, tgtVel, tgtTor, tgtKp, tgtKd);
@@ -743,20 +878,21 @@ int main(int argc, char** argv) {
     
     // Policy update timing (50 Hz = 20ms)
     const int POLICY_PERIOD_US = 20000;  // 20ms in microseconds
+    const auto policy_period = std::chrono::microseconds(POLICY_PERIOD_US);
     auto last_policy_update = std::chrono::steady_clock::now();
     
     // PD control update timing — only used for sim/CST mode (200 Hz = 5ms)
     const int PD_UPDATE_PERIOD_MS = 5;  // 5ms = 5 iterations at 1kHz
     int pd_update_counter = 0;
     
-    // PVT mode vectors (reusable, 15 motors)
-    std::vector<float> pvtPosTarget(15, 0.0f);   // Step target from 50Hz RL action
-    std::vector<float> pvtPosPrevious(15, 0.0f); // Previous target for interpolation
-    std::vector<float> pvtPosInterpolated(15, 0.0f); // Smoothed target applied to hardware
-    std::vector<float> pvtVel(15, 0.0f);
-    std::vector<float> pvtTor(15, 0.0f);
-    std::vector<float> pvtKp(PD_KP, PD_KP +15);
-    std::vector<float> pvtKd(PD_KD, PD_KD +15);
+    // PVT mode vectors (reusable, 13 motors)
+    std::vector<float> pvtPosTarget(13, 0.0f);   // Step target from 50Hz RL action
+    std::vector<float> pvtPosPrevious(13, 0.0f); // Previous target for interpolation
+    std::vector<float> pvtPosInterpolated(13, 0.0f); // Smoothed target applied to hardware
+    std::vector<float> pvtVel(13, 0.0f);
+    std::vector<float> pvtTor(13, 0.0f);
+    std::vector<float> pvtKp(PD_KP, PD_KP +13);
+    std::vector<float> pvtKd(PD_KD, PD_KD +13);
     
     // Fetch state once to prime the filters and targets
     if (!robot->fetchObs(rpy, base_ang_vel, joint_pos, joint_vel)) {
@@ -765,7 +901,7 @@ int main(int argc, char** argv) {
     }
     
     // Initialize interpolated and previous POS to current actual joint state to avoid immediate jump
-    for(int i = 0; i < 15; ++i) {
+    for(int i = 0; i < 13; ++i) {
         pvtPosInterpolated[i] = joint_pos[i];
         pvtPosPrevious[i] = joint_pos[i];
         pvtPosTarget[i] = joint_pos[i];
@@ -796,14 +932,19 @@ int main(int argc, char** argv) {
         auto now = std::chrono::steady_clock::now();
         auto time_since_policy = std::chrono::duration_cast<std::chrono::microseconds>(
             now - last_policy_update).count();
+        bool policy_due = time_since_policy >= POLICY_PERIOD_US;
         
-        if (time_since_policy >= POLICY_PERIOD_US) {
+        if (policy_due) {
+            for (int i = 0; i < 3; ++i) {
+                filtered_commands[i] = (1.0f - CMD_FILTER_ALPHA) * filtered_commands[i] + CMD_FILTER_ALPHA * commands[i];
+            }
+
             // Apply inverse ankle solver to observations (convert motor angles back to virtual ankle angles)
             std::vector<float> corrected_joint_pos = joint_pos;
             applyAnkleSolverInverse(corrected_joint_pos, ankle_solver);
             
             // Build observation with corrected joint positions
-            buildObservation(rpy, base_ang_vel, corrected_joint_pos, joint_vel, commands, previous_actions, observation);
+            buildObservation(rpy, base_ang_vel, corrected_joint_pos, joint_vel, filtered_commands, previous_actions, observation);
             
             // Log observations to CSV before inference (use corrected positions)
             if (csv_file.is_open()) {
@@ -819,7 +960,7 @@ int main(int argc, char** argv) {
                 for (int i = 0; i < 12; ++i) {
                     csv_file << joint_vel[i] << ",";
                 }
-                csv_file << commands[0] << "," << commands[1] << "," << commands[2] << ",";
+                csv_file << filtered_commands[0] << "," << filtered_commands[1] << "," << filtered_commands[2] << ",";
                 for (int i = 0; i < 12; ++i) {
                     csv_file << previous_actions[i] << ",";
                 }
@@ -839,6 +980,8 @@ int main(int argc, char** argv) {
                 break;
             }
 
+            clipActionsInPlace(actions);
+
             if (obs_log_file.is_open()) {
                 for (int i = 0; i < 45; ++i) {
                     obs_log_file << observation[i];
@@ -857,8 +1000,11 @@ int main(int argc, char** argv) {
             
             // Update previous actions
             previous_actions = actions;
-            
-            last_policy_update = now;
+
+            while (time_since_policy >= POLICY_PERIOD_US) {
+                last_policy_update += policy_period;
+                time_since_policy -= POLICY_PERIOD_US;
+            }
             policy_count++;
         }
         
@@ -872,30 +1018,26 @@ int main(int argc, char** argv) {
             
             // At the exact moment the policy updates (time_since_policy >= POLICY_PERIOD_US block above),
             // we compute new pvtPosTarget. We must save the old target to pvtPosPrevious to interpolate.
-            if(time_since_policy >= POLICY_PERIOD_US) {
-                pvtPosPrevious = pvtPosTarget;  // Cycle the targets for the new 20ms window
+            if(policy_due) {
+                pvtPosPrevious = pvtPosInterpolated;  // Start from actual reached position for zero-jump continuity
                 
                 // Compute new target positions from actions (updated at 50Hz)
-                for(int i = 0; i < 15; ++i){
-                    pvtPosTarget[i] = DEFAULT_JOINT_ANGLES[i];
-                    if(i < 12){
-                        pvtPosTarget[i] = DEFAULT_JOINT_ANGLES[i] + actions[i] * ACTION_SCALE[i];
-                    }
-                }
+                float target_pos_arr[13];
+                buildSafeTargetPositions(actions, target_pos_arr);
                 
                 // Apply ankle solver transformation if enabled
-                float target_pos_arr[15];
-                for(int i = 0; i < 15; ++i) target_pos_arr[i] = pvtPosTarget[i];
                 applyAnkleSolver(target_pos_arr, ankle_solver);
-                for(int i = 0; i < 15; ++i) pvtPosTarget[i] = target_pos_arr[i];
+                for(int i = 0; i < 13; ++i) pvtPosTarget[i] = target_pos_arr[i];
                 
                 // Reset alpha for the very first frame of the new update
                 interpolation_alpha = 0.0f;
             }
 
             // Apply Linear Interpolation between previous target and new target
-            for(int i = 0; i < 15; ++i){
-                pvtPosInterpolated[i] = pvtPosPrevious[i] * (1.0f - interpolation_alpha) + pvtPosTarget[i] * interpolation_alpha;
+            for(int i = 0; i < 13; ++i){
+                float interpolated_target = pvtPosPrevious[i] * (1.0f - interpolation_alpha) + pvtPosTarget[i] * interpolation_alpha;
+                float max_step = PVT_MAX_VEL[i] * 0.001f;
+                pvtPosInterpolated[i] = stepTowardLimited(pvtPosInterpolated[i], interpolated_target, max_step);
             }
             
             // Store zeros for torque logging (driver computes actual torques internally)
@@ -911,19 +1053,14 @@ int main(int argc, char** argv) {
             // Recalculate PD control every 5ms (200 Hz)
             if(pd_update_counter == 0){
                 // Convert actions to joint targets and compute PD torque commands
-                float target_pos[15] = {0.0f};
-                for(int i = 0; i < 15; ++i){
-                    target_pos[i] = DEFAULT_JOINT_ANGLES[i];
-                    if(i < 12){
-                        target_pos[i] = DEFAULT_JOINT_ANGLES[i] +actions[i]*ACTION_SCALE[i];
-                    }
-                }
+                float target_pos[13] = {0.0f};
+                buildSafeTargetPositions(actions, target_pos);
 
                 // Apply ankle solver transformation if enabled
                 applyAnkleSolver(target_pos, ankle_solver);
 
                 // Prepare torque commands for 12 leg joints + 3 waist motors
-                std::vector<float> torques(15, 0.0f);
+                std::vector<float> torques(13, 0.0f);
                 
                 // Leg motors (0-11)
                 for(int i = 0; i < 12; ++i){
@@ -945,7 +1082,7 @@ int main(int argc, char** argv) {
                 }
                 
                 // Waist motors (12-14)
-                for(int i = 12; i < 15; ++i){
+                for(int i = 12; i < 13; ++i){
                     float target = DEFAULT_JOINT_ANGLES[i];
                     float actual = joint_pos[i];
                     float actual_vel = joint_vel[i];
@@ -1027,4 +1164,3 @@ int main(int argc, char** argv) {
     std::cout << "Done." << std::endl;
     return 0;
 }
-

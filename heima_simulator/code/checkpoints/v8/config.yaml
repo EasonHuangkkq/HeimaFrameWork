@@ -49,14 +49,14 @@ default_joint_angles:
   - 0.0  # Left: hip_yaw
   - 0.4  # Left: hip_pitch
   - -0.8  # Left: knee
-  - 0.4  # Left: ankle_pitch
-  - 0.0  # Left: ankle_roll
+  - 0.2  # Left: ankle_pitch
+  - 0.2  # Left: ankle_roll
   - 0.0  # Right: hip_roll
   - 0.0  # Right: hip_yaw
   - 0.4  # Right: hip_pitch
   - -0.8  # Right: knee
-  - 0.4  # Right: ankle_pitch
-  - 0.0  # Right: ankle_roll
+  - 0.2  # Right: ankle_pitch
+  - 0.2  # Right: ankle_roll
   - 0.0  # Waist motor 1
   - 0.0  # Waist motor 2
   - 0.0  # Waist motor 3
@@ -80,6 +80,42 @@ action_scale:
   - 1.0  # Waist motor 1
   - 1.0  # Waist motor 2
   - 1.0  # Waist motor 3
+
+safety:
+  action_clip: 1.0
+  target_pos_min: 
+    - -0.14   # 右腿 hip_roll (hardware: ±0.18, 保守20%)
+    - -0.32   # 右腿 hip_yaw (hardware: ±0.40)
+    - -0.80   # 右腿 hip_pitch (hardware: -1.0~1.2)
+    - -1.20   # 右腿 knee (hardware: -1.5~0.05)
+    - -0.25   # 右腿 ankle_pitch (hardware: -0.45~0.62)
+    - -0.25   # 右腿 ankle_roll (hardware: -0.57~0.69)
+    - -0.14   # 左腿 hip_roll
+    - -0.32   # 左腿 hip_yaw
+    - -0.80   # 左腿 hip_pitch
+    - -1.20   # 左腿 knee
+    - -0.3   # 左腿 ankle_pitch
+    - -0.3    # 左腿 ankle_roll
+    - -5.0    # 腰部 1 (hardware: ±6.28)
+    - -5.0    # 腰部 2
+    - -5.0    # 腰部 3
+  target_pos_max: 
+    - 0.14
+    - 0.32
+    - 0.96
+    - 0.04
+    - 0.25
+    - 0.25
+    - 0.14
+    - 0.32
+    - 0.96
+    - 0.04
+    - 0.3
+    - 0.3
+    - 5.0
+    - 5.0
+    - 5.0
+  pvt_max_vel: 10.0
 
 # Observation scaling factors (for neural network input normalization)
 # These scales are applied to observations before feeding to the neural network

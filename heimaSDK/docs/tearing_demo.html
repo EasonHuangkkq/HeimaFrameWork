@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Triple Buffer 帧撕裂演示</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0f1117;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #ff6b6b, #ffa500);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 20px;
+  }
+
+  /* Layout */
+  .main {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Triple buffer area */
+  .buffer-area {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 20px;
+    background: #161822;
+    border-radius: 12px;
+    border: 1px solid #2a2d3a;
+    position: relative;
+  }
+  .buffer-box {
+    width: 220px;
+    border-radius: 10px;
+    border: 2px solid #333;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .buffer-box.active-read {
+    border-color: #4ecdc4;
+    box-shadow: 0 0 16px rgba(78,205,196,0.3);
+  }
+  .buffer-box.active-write {
+    border-color: #ff6b6b;
+    box-shadow: 0 0 16px rgba(255,107,107,0.3);
+  }
+  .buffer-header {
+    padding: 8px 12px;
+    font-weight: 700;
+    font-size: 14px;
+    text-align: center;
+    background: #1e2030;
+  }
+  .buffer-content {
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    min-height: 140px;
+  }
+  .field-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.3s;
+  }
+  .field-row.highlight-read {
+    background: rgba(78,205,196,0.2);
+  }
+  .field-row.highlight-torn {
+    background: rgba(255,107,107,0.25);
+  }
+  .field-name { color: #8892b0; }
+  .field-val { font-weight: 700; }
+  .frame-n { color: #4ecdc4; }
+  .frame-n1 { color: #ff6b6b; }
+
+  /* nodePtr indicator */
+  .ptr-label {
+    position: absolute;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    transition: all 0.4s ease;
+    z-index: 10;
+  }
+  .ptr-label.nodeptr {
+    background: #ffa500;
+    color: #000;
+    top: 6px;
+  }
+
+  /* App read result */
+  .result-area {
+    background: #161822;
+    border-radius: 12px;
+    border: 1px solid #2a2d3a;
+    padding: 16px 20px;
+  }
+  .result-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #ccc;
+  }
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .result-cell {
+    background: #1e2030;
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+    border: 1px solid #2a2d3a;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .result-cell .label { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .result-cell .value { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; }
+  .result-cell.from-n { border-color: #4ecdc4; }
+  .result-cell.from-n1 { border-color: #ff6b6b; background: rgba(255,107,107,0.08); }
+  .result-cell.torn-indicator { border-color: #ff6b6b; background: rgba(255,0,0,0.12); }
+
+  /* Timeline / narration */
+  .narration {
+    background: #1a1c2e;
+    border-radius: 10px;
+    border: 1px solid #2a2d3a;
+    padding: 14px 18px;
+    font-size: 14px;
+    line-height: 1.7;
+    min-height: 60px;
+  }
+  .narration code {
+    background: #2a2d3a;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .narration .key { color: #ffa500; font-weight: 700; }
+  .narration .good { color: #4ecdc4; }
+  .narration .bad { color: #ff6b6b; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  button {
+    font-family: 'Inter', sans-serif;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s;
+  }
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-next {
+    background: linear-gradient(135deg, #4ecdc4, #44b3a8);
+    color: #000;
+  }
+  .btn-reset {
+    background: #2a2d3a;
+    color: #ccc;
+  }
+  .btn-auto {
+    background: linear-gradient(135deg, #ffa500, #ff8c00);
+    color: #000;
+  }
+  .step-counter {
+    font-size: 13px;
+    color: #666;
+    align-self: center;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    font-size: 12px;
+    color: #888;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .legend-dot.cyan { background: #4ecdc4; }
+  .legend-dot.red { background: #ff6b6b; }
+  .legend-dot.orange { background: #ffa500; }
+</style>
+</head>
+<body>
+
+<div class="main">
+  <h1>为什么 operator->() 每次 load 会导致帧撕裂</h1>
+  <p class="subtitle">点击「下一步」逐步观察 App 线程读取电机数据时，RT 线程切帧造成的数据不一致</p>
+
+  <div class="legend">
+    <span><span class="legend-dot cyan"></span>帧 N 的数据（旧）</span>
+    <span><span class="legend-dot red"></span>帧 N+1 的数据（新）</span>
+    <span><span class="legend-dot orange"></span>nodePtr 指向</span>
+  </div>
+
+  <div class="buffer-area" id="bufferArea">
+    <div class="ptr-label nodeptr" id="ptrLabel">nodePtr ▼</div>
+    <div class="buffer-box" id="boxA">
+      <div class="buffer-header">Node A</div>
+      <div class="buffer-content" id="contentA"></div>
+    </div>
+    <div class="buffer-box" id="boxB">
+      <div class="buffer-header">Node B</div>
+      <div class="buffer-content" id="contentB"></div>
+    </div>
+    <div class="buffer-box" id="boxC">
+      <div class="buffer-header">Node C</div>
+      <div class="buffer-content" id="contentC"></div>
+    </div>
+  </div>
+
+  <div class="result-area">
+    <div class="result-title">📋 App 线程读到的 motorActualStruct（电机 #1）</div>
+    <div class="result-grid" id="resultGrid">
+      <div class="result-cell" id="rPos"><div class="label">Position</div><div class="value" id="vPos">—</div></div>
+      <div class="result-cell" id="rVel"><div class="label">Velocity</div><div class="value" id="vVel">—</div></div>
+      <div class="result-cell" id="rTor"><div class="label">Torque</div><div class="value" id="vTor">—</div></div>
+      <div class="result-cell" id="rStat"><div class="label">StatusWord</div><div class="value" id="vStat">—</div></div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">
+    按下「下一步」开始演示。我们将模拟 App 线程调用 <code>getMotorActual()</code> 时，逐字段通过 <code>operator->()</code> 读取数据的过程。
+  </div>
+
+  <div class="controls">
+    <button class="btn-reset" onclick="resetDemo()">重置</button>
+    <button class="btn-next" id="btnNext" onclick="nextStep()">下一步 →</button>
+    <button class="btn-auto" id="btnAuto" onclick="autoPlay()">自动演示 ▶</button>
+    <span class="step-counter" id="stepCounter">Step 0 / 7</span>
+  </div>
+</div>
+
+<script>
+// === Data Model ===
+const frameN = { pos: 1.2345, vel: 0.5000, tor: 2.100, stat: '0x0037' };
+const frameN1 = { pos: 1.2351, vel: 0.5120, tor: 2.150, stat: '0x0037' };
+
+// Nodes: A has frame N, B will get frame N+1
+let currentStep = 0;
+const totalSteps = 7;
+
+const fields = ['pos', 'vel', 'tor', 'stat'];
+const fieldNames = { pos: 'ActualPosition', vel: 'ActualVelocity', tor: 'ActualTorque', stat: 'StatusWord' };
+
+function renderBuffer(id, frameData, label, highlightField, highlightClass){
+  const el = document.getElementById(id);
+  let html = '';
+  for(const f of fields){
+    const name = fieldNames[f];
+    const val = frameData[f];
+    let cls = '';
+    if(highlightField === f && highlightClass) cls = highlightClass;
+    const valCls = label === 'N' ? 'frame-n' : 'frame-n1';
+    html += `<div class="field-row ${cls}"><span class="field-name">${name}</span><span class="field-val ${valCls}">${val}</span></div>`;
+  }
+  return html;
+}
+
+function positionPtr(targetBoxId){
+  const area = document.getElementById('bufferArea');
+  const box = document.getElementById(targetBoxId);
+  const ptr = document.getElementById('ptrLabel');
+  const areaRect = area.getBoundingClientRect();
+  const boxRect = box.getBoundingClientRect();
+  ptr.style.left = (boxRect.left - areaRect.left + boxRect.width/2 - 36) + 'px';
+}
+
+function clearHighlights(){
+  document.querySelectorAll('.buffer-box').forEach(b => {
+    b.classList.remove('active-read', 'active-write');
+  });
+  document.querySelectorAll('.field-row').forEach(r => {
+    r.classList.remove('highlight-read', 'highlight-torn');
+  });
+  document.querySelectorAll('.result-cell').forEach(c => {
+    c.classList.remove('from-n', 'from-n1', 'torn-indicator');
+  });
+}
+
+function setResult(field, value, frameLabel){
+  const idMap = { pos: 'vPos', vel: 'vVel', tor: 'vTor', stat: 'vStat' };
+  const cellMap = { pos: 'rPos', vel: 'rVel', tor: 'rTor', stat: 'rStat' };
+  document.getElementById(idMap[field]).textContent = value;
+  const cell = document.getElementById(cellMap[field]);
+  cell.classList.add(frameLabel === 'N' ? 'from-n' : 'from-n1');
+}
+
+const steps = [
+  // Step 0: initial state
+  function(){
+    clearHighlights();
+    document.getElementById('contentA').innerHTML = renderBuffer('contentA', frameN, 'N', null, null);
+    document.getElementById('contentB').innerHTML = '<div style="color:#555;text-align:center;padding:20px;">（空闲）</div>';
+    document.getElementById('contentC').innerHTML = '<div style="color:#555;text-align:center;padding:20px;">（空闲）</div>';
+    positionPtr('boxA');
+    document.getElementById('narration').innerHTML =
+      `<span class="key">初始状态：</span>RT 线程刚把 EtherCAT <span class="good">帧 N</span> 的数据写入了 Node A。<code>nodePtr</code> 指向 A。<br>现在 App 线程开始调用 <code>getMotorActual()</code>...`;
+  },
+  // Step 1: App reads Position
+  function(){
+    clearHighlights();
+    document.getElementById('boxA').classList.add('active-read');
+    document.getElementById('contentA').innerHTML = renderBuffer('contentA', frameN, 'N', 'pos', 'highlight-read');
+    setResult('pos', frameN.pos, 'N');
+    document.getElementById('narration').innerHTML =
+      `<span class="key">App 读 Position：</span><code>drivers[i].tx->ActualPosition</code><br>` +
+      `<code>operator->()</code> 内部执行 <code>nodePtr.load()</code> → 得到 <span class="good">Node A</span> → 读取 Position = <span class="good">${frameN.pos}</span>  ✅ 来自帧 N`;
+  },
+  // Step 2: App reads Velocity
+  function(){
+    clearHighlights();
+    document.getElementById('boxA').classList.add('active-read');
+    document.getElementById('contentA').innerHTML = renderBuffer('contentA', frameN, 'N', 'vel', 'highlight-read');
+    setResult('vel', frameN.vel, 'N');
+    document.getElementById('narration').innerHTML =
+      `<span class="key">App 读 Velocity：</span><code>drivers[i].tx->ActualVelocity</code><br>` +
+      `<code>operator->()</code> <b>又</b>执行了一次 <code>nodePtr.load()</code> → 仍然是 <span class="good">Node A</span> → 读取 Velocity = <span class="good">${frameN.vel}</span>  ✅ 来自帧 N<br>` +
+      `<em style="color:#888">目前还没问题，因为 RT 线程还没切帧。</em>`;
+  },
+  // Step 3: RT thread publishes frame N+1 !!! THE KEY MOMENT !!!
+  function(){
+    clearHighlights();
+    // RT writes to B and advances nodePtr
+    document.getElementById('contentB').innerHTML = renderBuffer('contentB', frameN1, 'N+1', null, null);
+    document.getElementById('boxB').classList.add('active-write');
+    positionPtr('boxB');
+    document.getElementById('narration').innerHTML =
+      `<span class="bad">⚡ RT 线程介入！</span> EtherCAT 总线完成了新一轮 1kHz 采样。<br>` +
+      `RT 线程执行 <code>copyFrom()</code>：把<span class="bad">帧 N+1</span> 写入 Node B，然后 <code>nodePtr.store(B)</code><br>` +
+      `<b>现在 <code>nodePtr</code> 指向 B 了！</b> 但 App 线程根本不知道这件事，它还在继续读下一个字段...`;
+  },
+  // Step 4: App reads Torque — NOW FROM B !!!
+  function(){
+    clearHighlights();
+    document.getElementById('contentB').innerHTML = renderBuffer('contentB', frameN1, 'N+1', 'tor', 'highlight-torn');
+    document.getElementById('boxB').classList.add('active-read');
+    positionPtr('boxB');
+    setResult('tor', frameN1.tor, 'N+1');
+    document.getElementById('narration').innerHTML =
+      `<span class="bad">💥 撕裂发生！</span><code>drivers[i].tx->ActualTorque</code><br>` +
+      `<code>operator->()</code> 执行 <code>nodePtr.load()</code> → 这次得到的是 <span class="bad">Node B</span>！<br>` +
+      `读取 Torque = <span class="bad">${frameN1.tor}</span>  ❌ 来自<span class="bad">帧 N+1</span>！<br>` +
+      `<b>Position 来自帧 N，Torque 来自帧 N+1 —— 这组数据在物理上从未同时存在过。</b>`;
+  },
+  // Step 5: App reads StatusWord — also from B
+  function(){
+    clearHighlights();
+    document.getElementById('contentB').innerHTML = renderBuffer('contentB', frameN1, 'N+1', 'stat', 'highlight-torn');
+    document.getElementById('boxB').classList.add('active-read');
+    positionPtr('boxB');
+    setResult('stat', frameN1.stat, 'N+1');
+    document.getElementById('narration').innerHTML =
+      `<span class="key">App 读 StatusWord：</span><code>drivers[i].tx->StatusWord</code><br>` +
+      `<code>nodePtr.load()</code> → <span class="bad">Node B</span> → StatusWord = <span class="bad">${frameN1.stat}</span><br>` +
+      `后续字段全部来自帧 N+1。读取完毕。`;
+  },
+  // Step 6: Show the torn result
+  function(){
+    clearHighlights();
+    document.getElementById('rPos').classList.add('from-n');
+    document.getElementById('rVel').classList.add('from-n');
+    document.getElementById('rTor').classList.add('from-n1');
+    document.getElementById('rStat').classList.add('from-n1');
+    positionPtr('boxB');
+    document.getElementById('narration').innerHTML =
+      `<span class="bad">🔴 最终结果：这就是撕裂（Torn Read）</span><br>` +
+      `<span class="good">Position (${frameN.pos})</span> 和 <span class="good">Velocity (${frameN.vel})</span> 来自 EtherCAT 帧 N<br>` +
+      `<span class="bad">Torque (${frameN1.tor})</span> 和 <span class="bad">StatusWord (${frameN1.stat})</span> 来自 EtherCAT 帧 N+1<br><br>` +
+      `这个 <code>motorActualStruct</code> 是一个<b>幽灵状态</b>——它是两个不同物理时刻的拼接产物。<br>` +
+      `控制器拿到的 pos/vel/tor 之间的物理关系不成立（比如速度对不上位置的变化率），可能导致力矩计算错误、滤波器发散。`;
+  },
+  // Step 7: Show the fix conceptually
+  function(){
+    clearHighlights();
+    positionPtr('boxB');
+    document.getElementById('narration').innerHTML =
+      `<span class="good">✅ 修复方法：在读取之前，先做一次 snapshot</span><br><br>` +
+      `如果在 <code>getMotorActual()</code> 开头，先执行一次 <code>memcpy(shadow, nodePtr.load()->memPtr, size)</code>，<br>` +
+      `把整个域缓冲区拷贝到栈上的 <code>shadow</code>，然后所有字段都从 <code>shadow</code> 中读取——<br><br>` +
+      `那么无论 RT 线程在中间切了多少次帧，<code>shadow</code> 里的数据始终来自同一帧。<br>` +
+      `<b>根本原因</b>：<code>operator->()</code> 每次都重新 <code>nodePtr.load()</code> 获取"最新"的节点——<br>` +
+      `但"最新"在两次调用之间可能已经变了。Snapshot 就是把"最新"冻结在一个时间点。`;
+  }
+];
+
+function nextStep(){
+  if(currentStep > totalSteps) return;
+  steps[currentStep]();
+  document.getElementById('stepCounter').textContent = `Step ${currentStep} / ${totalSteps}`;
+  currentStep++;
+  if(currentStep > totalSteps){
+    document.getElementById('btnNext').disabled = true;
+  }
+}
+
+function resetDemo(){
+  currentStep = 0;
+  clearHighlights();
+  ['vPos','vVel','vTor','vStat'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('contentA').innerHTML = '';
+  document.getElementById('contentB').innerHTML = '';
+  document.getElementById('contentC').innerHTML = '';
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('stepCounter').textContent = 'Step 0 / 7';
+  document.getElementById('narration').innerHTML =
+    '按下「下一步」开始演示。';
+  positionPtr('boxA');
+}
+
+let autoTimer = null;
+function autoPlay(){
+  if(autoTimer){ clearInterval(autoTimer); autoTimer = null; return; }
+  resetDemo();
+  autoTimer = setInterval(()=>{
+    if(currentStep > totalSteps){ clearInterval(autoTimer); autoTimer = null; return; }
+    nextStep();
+  }, 2500);
+}
+
+// Init
+window.addEventListener('load', ()=>{ positionPtr('boxA'); });
+window.addEventListener('resize', ()=>{
+  if(currentStep <= 3) positionPtr('boxA');
+  else positionPtr('boxB');
+});
+</script>
+
+</body>
+</html>

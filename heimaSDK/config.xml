@@ -78,8 +78,6 @@
             <Domain master="0" order="10" division="1"/>
             <Domain master="0" order="11" division="1"/>
             <Domain master="0" order="12" division="1"/>
-            <Domain master="0" order="13" division="1"/>
-            <Domain master="0" order="14" division="1"/>
         </Domains>
         <Slaves>
             <Slave master="0" domain="0" alias="1" type="MT_Device">1</Slave>
@@ -95,8 +93,7 @@
             <Slave master="0" domain="10" alias="11" type="MT_Device">1</Slave>
             <Slave master="0" domain="11" alias="12" type="MT_Device">1</Slave>
             <Slave master="0" domain="12" alias="13" type="MT_Device">1</Slave>
-            <Slave master="0" domain="13" alias="14" type="MT_Device">1</Slave>
-            <Slave master="0" domain="14" alias="15" type="MT_Device">1</Slave>
+
         </Slaves>
     </ECAT>
     <Motors>
@@ -112,8 +109,8 @@
             <TorqueConstant>2.81</TorqueConstant>
             <RatedTorque>85</RatedTorque>
             <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.18</MinimumPosition>
+            <MaximumPosition>0.18</MaximumPosition>
         </Motor>
         <!-- x12 motor -->
         <Motor limb="0" motor="1" alias="2">
@@ -126,8 +123,8 @@
             <TorqueConstant>2.81</TorqueConstant>
             <RatedTorque>85</RatedTorque>
             <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.4</MinimumPosition>
+            <MaximumPosition>0.4</MaximumPosition>
         </Motor>
         <!-- x15 motor -->
         <Motor limb="0" motor="2" alias="3">
@@ -140,8 +137,8 @@
             <TorqueConstant>4.579</TorqueConstant>
             <RatedTorque>145</RatedTorque>
             <MaximumTorque>450</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.7</MinimumPosition>
+            <MaximumPosition>1.2</MaximumPosition>
         </Motor>
         <!-- x12 motor -->
         <Motor limb="0" motor="3" alias="4">
@@ -154,8 +151,8 @@
             <TorqueConstant>2.81</TorqueConstant>
             <RatedTorque>85</RatedTorque>
             <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-1.5</MinimumPosition>
+            <MaximumPosition>0.05</MaximumPosition>
         </Motor>
         <!-- x6 motor -->
         <Motor limb="0" motor="4" alias="5">
@@ -168,8 +165,8 @@
             <TorqueConstant>1.5</TorqueConstant>
             <RatedTorque>20</RatedTorque>
             <MaximumTorque>60</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.3</MinimumPosition>
+            <MaximumPosition>0.3</MaximumPosition>
         </Motor>
         <!-- x6 motor -->
         <Motor limb="0" motor="5" alias="6">
@@ -182,8 +179,8 @@
             <TorqueConstant>1.5</TorqueConstant>
             <RatedTorque>20</RatedTorque>
             <MaximumTorque>60</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.3</MinimumPosition>
+            <MaximumPosition>0.3</MaximumPosition>
         </Motor>
         <!--left leg -->
         <!-- x12 motor -->
@@ -197,8 +194,8 @@
             <TorqueConstant>2.81</TorqueConstant>
             <RatedTorque>85</RatedTorque>
             <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.17</MinimumPosition>
+            <MaximumPosition>0.18</MaximumPosition>
         </Motor>
         <!-- x12 motor -->
         <Motor limb="1" motor="1" alias="8">
@@ -211,8 +208,8 @@
             <TorqueConstant>2.81</TorqueConstant>
             <RatedTorque>85</RatedTorque>
             <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.4</MinimumPosition>
+            <MaximumPosition>0.4</MaximumPosition>
         </Motor>
         <!-- x15 motor -->
         <Motor limb="1" motor="2" alias="9">
@@ -225,8 +222,8 @@
             <TorqueConstant>4.579</TorqueConstant>
             <RatedTorque>145</RatedTorque>
             <MaximumTorque>450</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.7</MinimumPosition>
+            <MaximumPosition>1.2</MaximumPosition>
         </Motor>
         <!-- x12 motor -->
         <Motor limb="1" motor="3" alias="10">
@@ -239,8 +236,8 @@
             <TorqueConstant>2.81</TorqueConstant>
             <RatedTorque>85</RatedTorque>
             <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-1.5</MinimumPosition>
+            <MaximumPosition>0.05</MaximumPosition>
         </Motor>
         <!-- x6 motor -->
         <Motor limb="1" motor="4" alias="11">
@@ -253,8 +250,8 @@
             <TorqueConstant>1.5</TorqueConstant>
             <RatedTorque>20</RatedTorque>
             <MaximumTorque>60</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.3</MinimumPosition>
+            <MaximumPosition>0.3</MaximumPosition>
         </Motor>
         <!-- x6 motor -->
         <Motor limb="1" motor="5" alias="12">
@@ -267,24 +264,11 @@
             <TorqueConstant>1.5</TorqueConstant>
             <RatedTorque>20</RatedTorque>
             <MaximumTorque>60</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.3</MinimumPosition>
+            <MaximumPosition>0.3</MaximumPosition>
         </Motor>
-
+        <!-- waist-->
         <Motor limb="4" motor="0" alias="13">
-            <Polarity>1</Polarity>
-            <CountBias>0</CountBias>
-            <EncoderResolution>131072</EncoderResolution>
-            <GearRatioTor>20</GearRatioTor>
-            <GearRatioPosVel>20</GearRatioPosVel>
-            <RatedCurrent>42.42</RatedCurrent>
-            <TorqueConstant>2.81</TorqueConstant>
-            <RatedTorque>85</RatedTorque>
-            <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
-        </Motor>
-        <Motor limb="4" motor="1" alias="14">
             <Polarity>-1</Polarity>
             <CountBias>0</CountBias>
             <EncoderResolution>131072</EncoderResolution>
@@ -294,21 +278,8 @@
             <TorqueConstant>2</TorqueConstant>
             <RatedTorque>43</RatedTorque>
             <MaximumTorque>120</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
-        </Motor>
-        <Motor limb="4" motor="2" alias="15">
-            <Polarity>1</Polarity>
-            <CountBias>0</CountBias>
-            <EncoderResolution>131072</EncoderResolution>
-            <GearRatioTor>20</GearRatioTor>
-            <GearRatioPosVel>20</GearRatioPosVel>
-            <RatedCurrent>42.42</RatedCurrent>
-            <TorqueConstant>2.81</TorqueConstant>
-            <RatedTorque>85</RatedTorque>
-            <MaximumTorque>320</MaximumTorque>
-            <MinimumPosition>-6.283185</MinimumPosition>
-            <MaximumPosition>6.283185</MaximumPosition>
+            <MinimumPosition>-0.1</MinimumPosition>
+            <MaximumPosition>0.1</MaximumPosition>
         </Motor>
     
     </Motors>

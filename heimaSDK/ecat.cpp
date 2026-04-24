@@ -780,25 +780,8 @@ void* ECAT::rxtx(void* arg){
                 tryCount = 0;
             }
         }
-        if(ecat->dc){
-            clock_gettime(CLOCK_MONOTONIC, &currentTime);
-            ecrt_master_sync_reference_clock_to(ecat->master, TIMESPEC2NS(currentTime));
-            /* unsigned int time = 0;
-            ecrt_master_reference_clock_time(ecat->master, &time); */
-            ecrt_master_sync_slave_clocks(ecat->master);
-        }
         count++;
-        i = 0;
-        while(i < domainCount){
-            if(ecat->rxPDOSwaps[i] != nullptr && count % ecat->domainDivision[i] == 0){
-                short dbg6071 = *(short*)(ecat->rxPDOSwaps[i]->nodePtr.load()->previous->memPtr + 10);
-                // printf("[DBG] copyTo dom %d 6071=%d\n", i, dbg6071);
-                ecat->rxPDOSwaps[i]->copyTo(ecat->domainPtrs[i], ecat->domainSizes[i]);
-                ecrt_domain_queue(ecat->domains[i]);
-            }
-            i++;
-        }
-        ecrt_master_send(ecat->master);
+        // ===== 1. 等待下一个周期 =====
         wakeupTime.tv_nsec += ecat->period;
         while(wakeupTime.tv_nsec >= NSEC_PER_SEC){
             wakeupTime.tv_nsec -= NSEC_PER_SEC;
@@ -820,10 +803,7 @@ void* ECAT::rxtx(void* arg){
                 }
             }
         }while(diff > 0);
-        if(ecat->dc){
-            clock_gettime(CLOCK_MONOTONIC, &currentTime);
-            ecrt_master_application_time(ecat->master, TIMESPEC2NS(currentTime));
-        }
+        // ===== 2. 接收 =====
         ecrt_master_receive(ecat->master);
         ecrt_master_state(ecat->master, &masterState);
         if(masterState.slaves_responding != slavesResponding){
@@ -834,6 +814,7 @@ void* ECAT::rxtx(void* arg){
             alStates = masterState.al_states;
             printf("master %d al_states changed to 0x%02x\n", ecat->order, alStates);
         }
+        // ===== 3. 处理接收数据 =====
         int incompleteness = 0;
         i = 0;
         while(i < domainCount){
@@ -904,6 +885,26 @@ void* ECAT::rxtx(void* arg){
             ecatStalled.store(incompleteness);
             previousIncompleteness = incompleteness;
         }
+        // ===== 4. DC同步（在receive之后）=====
+        if(ecat->dc){
+            clock_gettime(CLOCK_MONOTONIC, &currentTime);
+            ecrt_master_application_time(ecat->master, TIMESPEC2NS(currentTime));
+            ecrt_master_sync_reference_clock_to(ecat->master, TIMESPEC2NS(currentTime));
+            ecrt_master_sync_slave_clocks(ecat->master);
+        }
+        // ===== 5. 准备发送数据 =====
+        i = 0;
+        while(i < domainCount){
+            if(ecat->rxPDOSwaps[i] != nullptr && count % ecat->domainDivision[i] == 0){
+                short dbg6071 = *(short*)(ecat->rxPDOSwaps[i]->nodePtr.load()->previous->memPtr + 10);
+                // printf("[DBG] copyTo dom %d 6071=%d\n", i, dbg6071);
+                ecat->rxPDOSwaps[i]->copyTo(ecat->domainPtrs[i], ecat->domainSizes[i]);
+                ecrt_domain_queue(ecat->domains[i]);
+            }
+            i++;
+        }
+        // ===== 6. 发送 =====
+        ecrt_master_send(ecat->master);
     }
     return nullptr;
 }

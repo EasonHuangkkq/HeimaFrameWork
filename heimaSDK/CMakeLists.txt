@@ -129,6 +129,30 @@ target_link_libraries(whole_body_pvt_test PUBLIC
     m
 )
 
+# Ankle Hardware PVT test executable
+add_executable(test_ankle_hardware
+    test_ankle_hardware.cpp
+    ../heima_simulator/code/ankle_solver/cpp/ankle_solver.cpp
+    heima_driver_sdk.cpp
+    ecat.cpp
+    rs485.cpp
+    can.cpp
+    rs232.cpp
+    yesense_imu.cpp
+    yesense/src/yesense_decoder.cpp
+    yesense/src/yesense_std_out_decoder.cpp
+)
+target_include_directories(test_ankle_hardware PRIVATE
+    ../heima_simulator/code/ankle_solver/cpp
+    ../loong_utility-main/third_party/include/eigen3
+)
+target_compile_definitions(test_ankle_hardware PRIVATE ENABLE_RS232)
+target_link_libraries(test_ankle_hardware PUBLIC
+    driver_sdk
+    ${ETHERCAT_LIB}
+    Threads::Threads
+    m
+)
 # Python/ctypes-friendly shared library (C ABI)
 add_library(heima_sdk_c SHARED
     heima_sdk_c_api.cpp
